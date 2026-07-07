@@ -24,6 +24,8 @@ import { initModels, listModels, listAllProviders, registerProvider, listAvailab
 import { provider, type AgentEvent } from "./src/agent/provider.ts";
 import { setConfirmHandler, clearConfirmHandler } from "./src/agent/permissions.ts";
 import { ensureSkillsDir } from "./src/agent/skills.ts";
+import { ensureMcpConfig, connectAllMcpServers } from "./src/agent/mcp.ts";
+import { setMcpTools } from "./src/agent/tools/index.ts";
 import {
   createConversation, listConversations, renameConversation,
   moveConversation, deleteConversation, appendMessage, getMessages,
@@ -34,6 +36,7 @@ import { getApiKey } from "./src/infra/keychain.ts";
 initDb();
 initModels();
 ensureSkillsDir();
+ensureMcpConfig();
 
 // 启动时自动注册所有已经配置了 API Key 的 Provider
 (async () => {
@@ -47,6 +50,19 @@ ensureSkillsDir();
     }
   } catch (e) {
     console.warn("[main] 启动时动态注册 Provider 失败:", (e as Error).message);
+  }
+})();
+
+// 启动时连接 MCP server（异步，不阻塞主流程）
+(async () => {
+  try {
+    const tools = await connectAllMcpServers();
+    if (tools.length > 0) {
+      setMcpTools(tools);
+      console.log(`[main] MCP 工具已加载: ${tools.length} 个`);
+    }
+  } catch (e) {
+    console.warn("[main] MCP 连接失败:", (e as Error).message);
   }
 })();
 
@@ -80,7 +96,7 @@ function getQueue(sessionId: string): AgentEvent[] {
 // 确认请求挂起表（API /api/confirm 用）
 const pendingConfirms = new Map<string, (approved: boolean) => void>();
 
-async function handleApi(req: Request, path: string): Promise<Response> {
+export async function handleApi(req: Request, path: string): Promise<Response> {
   const json = (s: unknown) => new Response(JSON.stringify(s), { headers: { "content-type": "application/json" } });
   try {
     // GET /api/conv?category=&search=
@@ -111,6 +127,51 @@ async function handleApi(req: Request, path: string): Promise<Response> {
       const id = path.split("/")[3];
       return json(getMessages(id));
     }
+    // GET /api/mention/suggestions?q=xxx — 获取输入框 @ 联动推荐项
+    if (path === "/api/mention/suggestions" && req.method === "GET") {
+      const q = new URL(req.url).searchParams.get("q") || "";
+      const { getSetting } = await import("./src/domains/settings/node/store.ts");
+      const { recallMemories } = await import("./src/domains/memory/node/store.ts");
+      const docsDirRaw = getSetting("docs_dir", "~/Desktop");
+      const docsDir = docsDirRaw.startsWith("~/") ? (Deno.env.get("HOME") || "") + docsDirRaw.slice(1) : docsDirRaw;
+
+      // 1. 读取配置文件夹下的候选文件
+      const files: Array<{ name: string; path: string; type: "file" }> = [];
+      try {
+        for await (const entry of Deno.readDir(docsDir)) {
+          if (entry.isFile) {
+            const ext = entry.name.split(".").pop()?.toLowerCase() || "";
+            if (["docx", "xlsx", "pptx", "csv", "txt", "md", "json"].includes(ext)) {
+              if (!q || entry.name.toLowerCase().includes(q.toLowerCase())) {
+                files.push({ name: entry.name, path: `${docsDir}/${entry.name}`, type: "file" });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[main] 获取 suggestions 读取 docs_dir 失败:", e);
+      }
+
+      // 2. 读取记忆
+      const memories = recallMemories()
+        .filter((m: any) => !q || m.content.toLowerCase().includes(q.toLowerCase()))
+        .map((m: any) => ({ name: `🧠 记忆: ${m.content.slice(0, 30)}`, content: m.content, type: "memory" }));
+
+      // 3. 内置技能
+      const builtInSkills = [
+        { name: "📊 周报生成", q: "周报生成", type: "skill" },
+        { name: "📈 数据分析出表", q: "数据分析出表", type: "skill" },
+        { name: "🎨 PPT 制作", q: "PPT 制作", type: "skill" },
+        { name: "📝 文档润色", q: "文档润色", type: "skill" },
+        { name: "🔍 文档问答", q: "文档问答", type: "skill" },
+      ].filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()));
+
+      return json({
+        files: files.slice(0, 10),
+        memories: memories.slice(0, 5),
+        skills: builtInSkills.slice(0, 5)
+      });
+    }
     // POST /api/prompt  { sessionId, text, mode, permission }
     if (path === "/api/prompt" && req.method === "POST") {
       const b = await req.json();
@@ -127,7 +188,52 @@ async function handleApi(req: Request, path: string): Promise<Response> {
           setTimeout(() => { if (pendingConfirms.has(requestId)) { pendingConfirms.delete(requestId); resolve(false); } }, 120000);
         });
       });
-      provider.prompt(b.sessionId, b.text, { mode: b.mode || "craft", permission: b.permission || "default" });
+
+      // ===== 解析 @引用 文件内容 =====
+      let processedText = b.text || "";
+      const mentionRegex = /@([a-zA-Z0-9_\-\.\u4e00-\u9fa5]+\.[a-zA-Z0-9]+)/g;
+      let match;
+      const fileRefs = new Set<string>();
+      while ((match = mentionRegex.exec(b.text || "")) !== null) {
+        fileRefs.add(match[1]);
+      }
+
+      if (fileRefs.size > 0) {
+        const { getSetting } = await import("./src/domains/settings/node/store.ts");
+        const { readDoc } = await import("./src/domains/doc/node/reader.ts");
+        const docsDirRaw = getSetting("docs_dir", "~/Desktop");
+        const docsDir = docsDirRaw.startsWith("~/") ? (Deno.env.get("HOME") || "") + docsDirRaw.slice(1) : docsDirRaw;
+        
+        let fileContext = "";
+        for (const filename of fileRefs) {
+          const filePath = `${docsDir}/${filename}`;
+          try {
+            const stat = await Deno.stat(filePath);
+            if (stat.isFile) {
+              const readResult = await readDoc(filePath);
+              fileContext += `\n<referenced_file name="${filename}" path="${filePath}">\n${readResult.text}\n</referenced_file>\n`;
+              console.log(`[main] 自动加载 @引用 文件: ${filePath} (${readResult.text.length} 字符)`);
+            }
+          } catch (e) {
+            // 兜底：如果找不到，尝试在当前工作目录或绝对路径寻找
+            try {
+              const stat = await Deno.stat(filename);
+              if (stat.isFile) {
+                const readResult = await readDoc(filename);
+                fileContext += `\n<referenced_file name="${filename}" path="${filename}">\n${readResult.text}\n</referenced_file>\n`;
+                console.log(`[main] 自动加载 @引用 绝对路径文件: ${filename} (${readResult.text.length} 字符)`);
+              }
+            } catch {
+              console.warn(`[main] @引用 文件读取失败: ${filename}`, (e as Error).message);
+            }
+          }
+        }
+        if (fileContext) {
+          processedText = `${fileContext}\n${processedText}`;
+        }
+      }
+
+      provider.prompt(b.sessionId, processedText, { mode: b.mode || "craft", permission: b.permission || "default" });
       return json({ ok: true });
     }
     // POST /api/abort  { sessionId }
@@ -317,59 +423,76 @@ async function handleApi(req: Request, path: string): Promise<Response> {
         return json({ error: `预览加载失败: ${(e as Error).message}` });
       }
     }
+    // GET /api/mcp — 列出 MCP server 配置和连接状态
+    if (path === "/api/mcp" && req.method === "GET") {
+      const { loadMcpConfig } = await import("./src/agent/mcp.ts");
+      const { listMcpConnections } = await import("./src/agent/mcp.ts");
+      const config = await loadMcpConfig();
+      const connected = listMcpConnections();
+      return json({ config, connected });
+    }
+    // POST /api/mcp — 保存 MCP 配置并重连
+    if (path === "/api/mcp" && req.method === "POST") {
+      const b = await req.json();
+      const { saveMcpConfig, disconnectAllMcpServers, connectAllMcpServers } = await import("./src/agent/mcp.ts");
+      await saveMcpConfig(b);
+      await disconnectAllMcpServers();
+      const tools = await connectAllMcpServers();
+      setMcpTools(tools);
+      return json({ ok: true, toolCount: tools.length });
+    }
     return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { "content-type": "application/json" } });
   }
 }
 
-const httpServer = Deno.serve({ port: 0 }, async (req) => {
-  const url = new URL(req.url);
-  const path = url.pathname;
-  if (path === "/" || path === "/index.html") {
-    return new Response(RENDERER_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-  }
-  if (path.startsWith("/api/")) {
-    return handleApi(req, path);
-  }
-  return new Response("404", { status: 404 });
-});
-const servePort = (httpServer.addr as any).port;
-const serveUrl = `http://127.0.0.1:${servePort}/`;
-
-// ===== BrowserWindow =====
-const _Deno = Deno as any;
-const win: any = new _Deno.BrowserWindow({
-  width: 1080,
-  height: 740,
-  minWidth: 760,
-  minHeight: 480,
-  title: "Pi-a",
-  // 显式导航到我们的 serve URL
-  url: serveUrl,
-});
-
-// 监听窗口事件：最小化后从 Dock 点击恢复
-// deno desktop 的 reopen 事件发给 Dock 对象，需手动调 win.show() 恢复
-try {
-  const dock = _Deno.Dock ? new _Deno.Dock() : null;
-  if (dock) {
-    dock.addEventListener("reopen", () => {
-      console.log("[main] dock reopen，恢复窗口");
-      try { win.show(); win.focus(); } catch (e) { console.warn("[main] 恢复窗口失败:", e); }
-    });
-  }
-} catch (e) {
-  console.warn("[main] Dock 监听不可用:", e);
-}
-
-// 兜底：监听 BrowserWindow 自身的事件（如果 reopen 也发给 window）
-try {
-  win.addEventListener("reopen", () => {
-    try { win.show(); win.focus(); } catch {}
+if (import.meta.main) {
+  const httpServer = Deno.serve({ port: 0 }, async (req) => {
+    const url = new URL(req.url);
+    const path = url.pathname;
+    if (path === "/" || path === "/index.html") {
+      return new Response(RENDERER_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path.startsWith("/api/")) {
+      return handleApi(req, path);
+    }
+    return new Response("404", { status: 404 });
   });
-} catch {}
+  const servePort = (httpServer.addr as any).port;
+  const serveUrl = `http://127.0.0.1:${servePort}/`;
 
-console.log("[main] win.windowId =", win.windowId, "serveUrl =", serveUrl);
+  // ===== BrowserWindow =====
+  const _Deno = Deno as any;
+  const win: any = new _Deno.BrowserWindow({
+    width: 1080,
+    height: 740,
+    minWidth: 760,
+    minHeight: 480,
+    title: "Pi-a",
+    url: serveUrl,
+  });
 
-console.log("[main] Pi-a 已就绪，使用 HTTP API（/api/*）通信");
+  // 监听窗口事件：最小化后从 Dock 点击恢复
+  try {
+    const dock = _Deno.Dock ? new _Deno.Dock() : null;
+    if (dock) {
+      dock.addEventListener("reopen", () => {
+        console.log("[main] dock reopen，恢复窗口");
+        try { win.show(); win.focus(); } catch (e) { console.warn("[main] 恢复窗口失败:", e); }
+      });
+    }
+  } catch (e) {
+    console.warn("[main] Dock 监听不可用:", e);
+  }
+
+  // 兜底：监听 BrowserWindow 自身的事件
+  try {
+    win.addEventListener("reopen", () => {
+      try { win.show(); win.focus(); } catch {}
+    });
+  } catch {}
+
+  console.log("[main] win.windowId =", win.windowId, "serveUrl =", serveUrl);
+  console.log("[main] Pi-a 已就绪，使用 HTTP API（/api/*）通信");
+}

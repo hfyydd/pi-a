@@ -10,6 +10,7 @@ import { getApiKey } from "../infra/keychain.ts";
 import { checkToolPermission, logToolCall } from "./permissions.ts";
 import { getTools } from "./tools/index.ts";
 import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
+import { recallMemories } from "../domains/memory/node/store.ts";
 
 const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
 
@@ -31,6 +32,8 @@ const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所
 - write_pptx：生成 PPT 演示文稿（提供幻灯片标题和要点）
 - memory_recall：读取长期记忆
 - memory_write：写入长期记忆（记住用户偏好和事实）
+- web_fetch：抓取网页内容（URL → 纯文本）
+- web_search：搜索引擎查询（获取最新信息）
 </tools>
 
 <agent_loop>
@@ -77,6 +80,24 @@ const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所
 </result_presentation>
 `;
 
+/** 加载记忆并注入系统提示（对标 WorkBuddy 四层记忆的简化版） */
+const MAX_MEMORY_CHARS = 5000; // 防止 prompt 爆炸
+function loadMemoryPrompt(): string {
+  try {
+    const memories = recallMemories();
+    if (memories.length === 0) return "";
+    const lines = memories
+      .map((m: any) => `- [${m.kind || "fact"}] ${m.content}`)
+      .join("\n");
+    const truncated = lines.length > MAX_MEMORY_CHARS
+      ? lines.slice(0, MAX_MEMORY_CHARS) + "\n...(更多记忆已截断)"
+      : lines;
+    return `\n\n<memory>\n以下是关于用户的长期记忆，请在回答时参考：\n${truncated}\n</memory>`;
+  } catch {
+    return "";
+  }
+}
+
 export interface AgentHandle {
   agent: Agent;
   /** 推送事件给前端（由调用方注入） */
@@ -114,7 +135,11 @@ export function createWorkBuddyAgent(
 
   // 注入技能提示词
   const skillsPrompt = loadSkillsPrompt();
-  const fullSystemPrompt = (opts?.systemPrompt ?? SYSTEM_PROMPT) + skillsPrompt;
+
+  // 注入记忆（自动召回，不用 agent 主动调 memory_recall）
+  const memoryPrompt = loadMemoryPrompt();
+
+  const fullSystemPrompt = (opts?.systemPrompt ?? SYSTEM_PROMPT) + memoryPrompt + skillsPrompt;
 
   const agent = new Agent({
     initialState: {

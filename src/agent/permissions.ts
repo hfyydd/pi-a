@@ -21,6 +21,26 @@ const WRITE_TOOLS = new Set([
   "write_pptx",
 ]);
 
+/** 危险命令黑名单（正则，所有权限级别都拦截） */
+const DANGEROUS_PATTERNS: RegExp[] = [
+  /rm\s+-rf?\s+\/($|\s)/i,       // rm -rf /
+  /rm\s+-rf?\s+~/,               // rm -rf ~
+  /rm\s+-rf?\s+\/Users/,         // rm -rf /Users
+  /mkfs/i,                        // 格式化磁盘
+  /dd\s+.*of=\/dev\//i,          // dd 写入设备
+  /:\(\)\s*\{.*\};:/,            // fork bomb
+  /\bchmod\s+-R\s+777\s+\//i,   // 递归 chmod 根目录
+  />\s*\/dev\/sd[a-z]/i,         // 写入磁盘设备
+  /\bsudo\s+rm\b/i,              // sudo rm
+  /curl\s+.*\|\s*(ba|z)?sh/i,           // curl pipe sh/bash/zsh
+  /wget\s+.*\|\s*(ba|z)?sh/i,           // wget pipe sh/bash/zsh
+];
+
+/** 检查命令是否危险 */
+function isDangerousCommand(command: string): boolean {
+  return DANGEROUS_PATTERNS.some((p) => p.test(command));
+}
+
 export interface PermissionDecision {
   /** allow=true 直接执行；allow=false 且 block=true 终止；allow=false 且 block=false 暂停待确认 */
   allow: boolean;
@@ -59,6 +79,15 @@ export async function checkToolPermission(
   toolName: string,
   args: unknown,
 ): Promise<PermissionDecision> {
+  // 危险命令拦截（黑名单，所有权限级别都强制拦截）
+  if (toolName === "bash") {
+    const cmdStr = (args as any)?.command || "";
+    if (isDangerousCommand(cmdStr)) {
+      console.warn(`[permissions] 拦截到危险命令: ${cmdStr}`);
+      return { allow: false, block: true, reason: "检测到危险命令，已被系统安全拦截。" };
+    }
+  }
+
   // 完全访问权限：全放行
   if (perm === "full") {
     return { allow: true };

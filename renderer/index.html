@@ -649,6 +649,27 @@
     .skill-item .sk-icon { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
     .skill-item .sk-title { font-size: 12.5px; font-weight: 550; color: var(--text); }
     .skill-item .sk-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; line-height: 1.4; }
+
+    /* @ 引用自动推荐菜单样式 */
+    .mention-dropdown {
+      position: absolute;
+      bottom: calc(100% + 6px); /* 悬浮于输入框上方 */
+      left: 12px;
+      background: var(--bg); border: 1px solid var(--border-strong);
+      border-radius: var(--r); box-shadow: var(--shadow-lg);
+      max-height: 220px; overflow-y: auto; width: 280px; z-index: 10000;
+      display: none; flex-direction: column; padding: 4px;
+    }
+    .mention-dropdown.show { display: flex; }
+    .mention-item {
+      padding: 6px 10px; border-radius: 6px; cursor: pointer;
+      font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 8px;
+      transition: background .1s;
+    }
+    .mention-item:hover, .mention-item.active { background: var(--bg-hover); color: var(--accent); }
+    .mention-item .m-icon { font-size: 14px; flex-shrink: 0; }
+    .mention-item .m-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mention-item .m-meta { font-size: 10px; color: var(--text-3); flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -732,6 +753,8 @@
 
     <div class="composer">
       <div class="composer-inner">
+        <!-- @ 引用联想下拉框 -->
+        <div class="mention-dropdown" id="mention-dropdown"></div>
         <div class="composer-box">
           <textarea id="input" rows="1" placeholder="给 Pi-a 发送消息，或描述你的任务…"></textarea>
           <div class="composer-toolbar">
@@ -841,6 +864,7 @@
           <button class="settings-tab" data-tab="tab-keys">🔑 API Keys</button>
           <button class="settings-tab" data-tab="tab-general">⚙️ 常规设置</button>
           <button class="settings-tab" data-tab="tab-memory">🧠 长期记忆</button>
+          <button class="settings-tab" data-tab="tab-mcp">🔌 MCP 插件</button>
         </div>
         <!-- 内容区域 -->
         <div class="settings-content active" id="tab-model">
@@ -896,6 +920,55 @@
           </div>
           <!-- 记忆列表 -->
           <div style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="memories-container"></div>
+        </div>
+
+        <div class="settings-content" id="tab-mcp" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
+          <h3 style="margin-bottom:10px;font-size:14px;font-weight:600;">MCP 插件管理</h3>
+          <p style="font-size:11.5px;color:var(--text-3);margin-bottom:12px;line-height:1.4;">通过 Model Context Protocol 连接本地或远程工具服务。保存后系统会自动重新加载连接。</p>
+          
+          <!-- 添加新 MCP Server 表单 -->
+          <div style="background:var(--bg-subtle);padding:12px;border-radius:8px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;border:1px solid var(--border-soft);">
+            <div style="font-weight:600;font-size:12px;color:var(--text-2);">添加 / 编辑 MCP 插件</div>
+            <div style="display:flex;gap:8px;">
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;color:var(--text-3);">插件 ID (英文唯一标识)</label>
+                <input type="text" id="mcp-name" placeholder="e.g. filesystem" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+              </div>
+              <div style="width:130px;display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;color:var(--text-3);">类型 (Type)</label>
+                <select id="mcp-type" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;">
+                  <option value="stdio">stdio (本地命令行)</option>
+                  <option value="sse">sse (HTTP SSE 协议)</option>
+                  <option value="http">http (HTTP Streamable)</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- stdio 特有参数 -->
+            <div id="mcp-stdio-fields" style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;color:var(--text-3);">启动命令 (Command)</label>
+                <input type="text" id="mcp-command" placeholder="e.g. npx" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+              </div>
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;color:var(--text-3);">命令参数 (Args，逗号分隔)</label>
+                <input type="text" id="mcp-args" placeholder="e.g. -y, @modelcontextprotocol/server-filesystem, /Users/xxx/Desktop" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+              </div>
+            </div>
+            
+            <!-- SSE/HTTP Web 特有参数 -->
+            <div id="mcp-web-fields" style="display:none;flex-direction:column;gap:8px;">
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <label style="font-size:11px;color:var(--text-3);">链接地址 (URL)</label>
+                <input type="text" id="mcp-url" placeholder="e.g. http://127.0.0.1:3000/sse" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+              </div>
+            </div>
+            
+            <button class="cd-btn cd-allow" id="btn-save-mcp" style="padding:6px 12px;border-radius:6px;font-size:12px;align-self:flex-end;cursor:pointer;">添加/更新配置</button>
+          </div>
+          
+          <!-- MCP 插件列表 -->
+          <div style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="mcp-container"></div>
         </div>
       </div>
     </div>
@@ -1466,6 +1539,9 @@
 
       // 渲染长期记忆
       await renderMemories();
+
+      // 渲染 MCP 列表
+      await renderMcpList();
     }
 
     closeSetBtn.onclick = () => setModal.classList.remove("show");
@@ -1582,10 +1658,166 @@
       await renderMemories();
     };
 
+    // ===== MCP Plugins Logic =====
+    const mcpNameInput = $("mcp-name"), mcpTypeSelect = $("mcp-type");
+    const mcpCommandInput = $("mcp-command"), mcpArgsInput = $("mcp-args");
+    const mcpUrlInput = $("mcp-url"), saveMcpBtn = $("btn-save-mcp"), mcpContainer = $("mcp-container");
+    const mcpStdioFields = $("mcp-stdio-fields"), mcpWebFields = $("mcp-web-fields");
+
+    // Toggle fields based on type select
+    mcpTypeSelect.onchange = () => {
+      const type = mcpTypeSelect.value;
+      if (type === "stdio") {
+        mcpStdioFields.style.display = "flex";
+        mcpWebFields.style.display = "none";
+      } else {
+        mcpStdioFields.style.display = "none";
+        mcpWebFields.style.display = "flex";
+      }
+    };
+
+    // Render MCP list
+    async function renderMcpList() {
+      try {
+        const { config, connected } = await apiGet("/api/mcp");
+        mcpContainer.innerHTML = "";
+        
+        const servers = Object.entries(config.mcpServers || {});
+        if (servers.length === 0) {
+          mcpContainer.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-size:12.5px;">未配置 MCP 插件。<br>请在上方录入配置并添加。</div>`;
+          return;
+        }
+
+        const table = document.createElement("table");
+        table.style.cssText = "width:100%;border-collapse:collapse;font-size:12.5px;";
+        table.innerHTML = `
+          <thead>
+            <tr style="background:var(--bg-subtle);border-bottom:1px solid var(--border-soft);">
+              <th style="padding:8px;text-align:left;width:80px;">插件 ID</th>
+              <th style="padding:8px;text-align:left;width:60px;">类型</th>
+              <th style="padding:8px;text-align:left;">配置详情</th>
+              <th style="padding:8px;text-align:left;width:70px;">状态</th>
+              <th style="padding:8px;text-align:center;width:90px;">操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector("tbody");
+        servers.forEach(([name, srv]) => {
+          const tr = document.createElement("tr");
+          tr.style.cssText = "border-bottom:1px solid var(--border-soft);";
+          
+          // Check connection status
+          const conn = connected.find(c => c.name === name);
+          const isConn = !!conn;
+          const statusText = srv.disabled 
+            ? '<span style="color:var(--text-3);">已禁用</span>' 
+            : (isConn 
+                ? `<span style="color:var(--green);font-weight:600;" title="${conn.tools.join(', ')}">已连接 (${conn.toolCount}个工具)</span>` 
+                : '<span style="color:var(--red);">连接中...</span>');
+
+          const typeLabel = srv.type || (srv.command ? "stdio" : "sse");
+          let configDetail = "";
+          if (srv.command) {
+            configDetail = `<code>${esc(srv.command)} ${esc((srv.args || []).join(' '))}</code>`;
+          } else {
+            configDetail = `<a href="${esc(srv.url)}" target="_blank" style="color:var(--accent);word-break:break-all;">${esc(srv.url)}</a>`;
+          }
+
+          tr.innerHTML = `
+            <td style="padding:8px;color:var(--text-2);font-weight:600;word-break:break-all;">${esc(name)}</td>
+            <td style="padding:8px;color:var(--text-3); font-size:11.5px;">${esc(typeLabel)}</td>
+            <td style="padding:8px;font-size:11.5px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${configDetail}</td>
+            <td style="padding:8px;font-size:11.5px;">${statusText}</td>
+            <td style="padding:8px;text-align:center;">
+              <button class="cd-btn" style="padding:2px 6px;font-size:11px;border-radius:4px;cursor:pointer;" onclick="toggleMcp('${name}')">${srv.disabled ? '启用' : '禁用'}</button>
+              <button class="conv-del" onclick="deleteMcp('${name}')" style="opacity:1;display:inline-flex;" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        mcpContainer.appendChild(table);
+      } catch (e) {
+        mcpContainer.innerHTML = `<div style="padding:20px;text-align:center;color:var(--red);">加载 MCP 列表失败: ${esc(e.message)}</div>`;
+      }
+    }
+
+    // Save/Update MCP server config
+    saveMcpBtn.onclick = async () => {
+      const name = mcpNameInput.value.trim();
+      const type = mcpTypeSelect.value;
+      if (!name) return alert("请输入插件 ID");
+
+      const srv = { type };
+
+      if (type === "stdio") {
+        const command = mcpCommandInput.value.trim();
+        const argsStr = mcpArgsInput.value.trim();
+        if (!command) return alert("请输入启动命令");
+        srv.command = command;
+        srv.args = argsStr ? argsStr.split(",").map(a => a.trim()).filter(Boolean) : [];
+      } else {
+        const url = mcpUrlInput.value.trim();
+        if (!url) return alert("请输入链接地址 URL");
+        srv.url = url;
+      }
+
+      // Fetch current config, update, and save
+      try {
+        const res = await apiGet("/api/mcp");
+        res.config.mcpServers = res.config.mcpServers || {};
+        res.config.mcpServers[name] = srv;
+        
+        await apiPost("/api/mcp", res.config);
+        
+        // Reset fields
+        mcpNameInput.value = "";
+        mcpCommandInput.value = "";
+        mcpArgsInput.value = "";
+        mcpUrlInput.value = "";
+        
+        await renderMcpList();
+        alert("MCP 插件配置成功并已重连");
+      } catch (e) {
+        alert("保存 MCP 配置失败: " + e.message);
+      }
+    };
+
+    // 删除长期记忆（之前被 MCP 逻辑替换时误删，补回）
     window.deleteMemory = async (id) => {
       if (!confirm("确认删除此条记忆吗？")) return;
       await apiDelete(`/api/memories/${id}`);
       await renderMemories();
+    };
+
+    // Toggle active status
+    window.toggleMcp = async (name) => {
+      try {
+        const res = await apiGet("/api/mcp");
+        if (res.config.mcpServers && res.config.mcpServers[name]) {
+          res.config.mcpServers[name].disabled = !res.config.mcpServers[name].disabled;
+          await apiPost("/api/mcp", res.config);
+          await renderMcpList();
+        }
+      } catch (e) {
+        alert("启用/禁用 MCP 失败: " + e.message);
+      }
+    };
+
+    // Delete configuration
+    window.deleteMcp = async (name) => {
+      if (!confirm(`确认删除 MCP 插件 "${name}" 的配置吗？`)) return;
+      try {
+        const res = await apiGet("/api/mcp");
+        if (res.config.mcpServers && res.config.mcpServers[name]) {
+          delete res.config.mcpServers[name];
+          await apiPost("/api/mcp", res.config);
+          await renderMcpList();
+          alert("MCP 插件配置已删除并重连");
+        }
+      } catch (e) {
+        alert("删除 MCP 失败: " + e.message);
+      }
     };
 
     // ===== Document Preview Modal Logic =====
@@ -1813,16 +2045,170 @@
     }
     $("btn-artifacts").onclick = toggleArtifacts;
     $("ap-close").onclick = toggleArtifacts;
+
+    // ===== @ 引用联想框交互逻辑 =====
+    const mentionDropdown = $("mention-dropdown");
+    let mentionActiveIdx = 0;
+    let mentionItems = [];
+    let mentionSearchQuery = "";
+    let mentionStartPos = -1; // @ 符号在输入框中的位置
+
+    async function checkMentionTrigger() {
+      const pos = inputEl.selectionStart;
+      const textBefore = inputEl.value.slice(0, pos);
+      // 匹配光标前半段末尾的 @ 词（支持字母、数字、点号、横杠、中文等）
+      const match = textBefore.match(/@([a-zA-Z0-9_\-\.\u4e00-\u9fa5]*)$/);
+      
+      if (match) {
+        mentionSearchQuery = match[1];
+        mentionStartPos = pos - match[0].length; // 记录 @ 字符的位置
+        await fetchMentionSuggestions(mentionSearchQuery);
+      } else {
+        hideMentionDropdown();
+      }
+    }
+
+    async function fetchMentionSuggestions(q) {
+      try {
+        const res = await apiGet("/api/mention/suggestions?q=" + encodeURIComponent(q));
+        mentionItems = [];
+        
+        // 1. 内置技能
+        res.skills.forEach(s => {
+          mentionItems.push({ name: s.name, type: "skill", insertText: s.name + " " });
+        });
+        // 2. 文件列表
+        res.files.forEach(f => {
+          mentionItems.push({ name: f.name, type: "file", insertText: f.name + " " });
+        });
+        // 3. 长期记忆
+        res.memories.forEach(m => {
+          mentionItems.push({ name: m.name, type: "memory", insertText: m.content + " " });
+        });
+
+        if (mentionItems.length > 0) {
+          showMentionSuggestions();
+        } else {
+          hideMentionDropdown();
+        }
+      } catch (e) {
+        console.error("[mentions] 获取推荐列表失败:", e);
+        hideMentionDropdown();
+      }
+    }
+
+    function showMentionSuggestions() {
+      mentionActiveIdx = 0;
+      renderMentionDropdown();
+      mentionDropdown.classList.add("show");
+    }
+
+    function hideMentionDropdown() {
+      mentionDropdown.classList.remove("show");
+      mentionItems = [];
+      mentionActiveIdx = 0;
+      mentionStartPos = -1;
+    }
+
+    function renderMentionDropdown() {
+      mentionDropdown.innerHTML = "";
+      const icons = { file: "📄", skill: "📊", memory: "🧠" };
+      const typeLabels = { file: "文件", skill: "技能", memory: "记忆" };
+      
+      mentionItems.forEach((item, idx) => {
+        const el = document.createElement("div");
+        el.className = "mention-item" + (idx === mentionActiveIdx ? " active" : "");
+        el.innerHTML = `
+          <span class="m-icon">${icons[item.type] || "📄"}</span>
+          <span class="m-name">${esc(item.name)}</span>
+          <span class="m-meta">${typeLabels[item.type]}</span>
+        `;
+        el.onclick = (e) => {
+          e.stopPropagation();
+          commitMentionSelection(item);
+        };
+        mentionDropdown.appendChild(el);
+      });
+      
+      // 将选中元素滚入视口
+      const activeEl = mentionDropdown.children[mentionActiveIdx];
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    function commitMentionSelection(item) {
+      const val = inputEl.value;
+      const pos = inputEl.selectionStart;
+      
+      const prefix = val.slice(0, mentionStartPos);
+      const suffix = val.slice(pos);
+      const insertStr = "@" + item.insertText;
+      
+      inputEl.value = prefix + insertStr + suffix;
+      const newCursorPos = mentionStartPos + insertStr.length;
+      inputEl.setSelectionRange(newCursorPos, newCursorPos);
+      
+      hideMentionDropdown();
+      inputEl.focus();
+      
+      // 高度重新计算与按钮可用状态自适应
+      inputEl.dispatchEvent(new Event("input"));
+    }
+
     inputEl.addEventListener("keydown", e => {
+      // 下拉菜单显示中，拦截上下方向键、Enter、Tab 与 Esc
+      if (mentionDropdown.classList.contains("show")) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          mentionActiveIdx = (mentionActiveIdx + 1) % mentionItems.length;
+          renderMentionDropdown();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          mentionActiveIdx = (mentionActiveIdx - 1 + mentionItems.length) % mentionItems.length;
+          renderMentionDropdown();
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          const activeItem = mentionItems[mentionActiveIdx];
+          if (activeItem) commitMentionSelection(activeItem);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          hideMentionDropdown();
+          return;
+        }
+      }
+
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        
         if (busy) abortRun(); else send();
       }
     });
+
     inputEl.addEventListener("input", () => {
       inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
       if (!busy) sendBtn.disabled = !inputEl.value.trim();
+      
+      // 检测是否触发 @ 联想
+      checkMentionTrigger();
+    });
+
+    inputEl.addEventListener("keyup", e => {
+      // 拦截删除和光标移动以更新下拉联想框
+      if (["ArrowLeft", "ArrowRight", "Backspace"].includes(e.key)) {
+        checkMentionTrigger();
+      }
+    });
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".composer-box") && !e.target.closest("#mention-dropdown")) {
+        hideMentionDropdown();
+      }
     });
     document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "n") { e.preventDefault(); newConv(); } });
 
@@ -1980,9 +2366,9 @@
     document.addEventListener("click", () => { document.querySelectorAll(".menu-pop.show").forEach(m => m.classList.remove("show")); });
 
     // 工具栏按钮（占位提示）
-    ["btn-skill","btn-connect","btn-attach"].forEach(id => {
+    ["btn-connect","btn-attach"].forEach(id => {
       $(id).addEventListener("click", () => {
-        const names = { "btn-skill": "技能市场（即将上线）", "btn-connect": "连接应用（即将上线）", "btn-attach": "附件上传（即将上线）" };
+        const names = { "btn-connect": "连接应用（即将上线）", "btn-attach": "附件上传（即将上线）" };
         inputEl.placeholder = names[id];
         setTimeout(() => { if (!busy) inputEl.placeholder = "给 Pi-a 发送消息，或描述你的任务…"; }, 1800);
       });
