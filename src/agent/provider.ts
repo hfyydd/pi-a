@@ -33,7 +33,7 @@ export interface AgentProvider {
   /** 中止当前 */
   abort(sessionId: string): Promise<void>;
   /** 订阅某会话的事件流 */
-  onEvent(sessionId: string, cb: (e: AgentEvent) => void): () => void;
+  onEvent(sessionId: string, cb: (e: AgentEvent) => void): Promise<() => void>;
   /** 销毁某会话 */
   dispose(sessionId: string): Promise<void>;
 }
@@ -72,15 +72,25 @@ export class LocalPiProvider implements AgentProvider {
   readonly id = "local" as const;
   private sessions = new Map<string, SessionEntry>();
 
-  private ensureSession(sessionId: string): SessionEntry {
+  private async ensureSession(sessionId: string): Promise<SessionEntry> {
     let entry = this.sessions.get(sessionId);
     if (!entry) {
       const listeners = new Set<(e: AgentEvent) => void>();
       
-      // 查询会话的模型配置
+      // 查询会话的模型配置 + 专家配置
       const db = getDb();
-      const conv = db.prepare("SELECT model_provider, model_id FROM conversations WHERE id = ?").get(sessionId) as { model_provider: string; model_id: string } | undefined;
-      
+      const conv = db.prepare("SELECT model_provider, model_id, expert_id FROM conversations WHERE id = ?").get(sessionId) as { model_provider: string; model_id: string; expert_id?: string } | undefined;
+
+      // 如果有专家，加载专家的 system prompt
+      let expertPrompt: string | undefined;
+      if (conv?.expert_id) {
+        try {
+          const { getExpert } = await import("./experts.ts");
+          const expert = getExpert(conv.expert_id);
+          if (expert) expertPrompt = expert.systemPrompt;
+        } catch {}
+      }
+
       const handle = createWorkBuddyAgent((event) => {
         // 广播给该会话的所有监听者
         for (const cb of listeners) {
@@ -93,6 +103,7 @@ export class LocalPiProvider implements AgentProvider {
       }, {
         modelProvider: conv?.model_provider || "deepseek",
         modelId: conv?.model_id || "deepseek-v4-flash",
+        systemPrompt: expertPrompt,
       });
       entry = { handle, listeners, lastOpts: DEFAULT_OPTS };
       this.sessions.set(sessionId, entry);
@@ -102,7 +113,7 @@ export class LocalPiProvider implements AgentProvider {
   }
 
   async prompt(sessionId: string, text: string, opts?: PromptOptions): Promise<void> {
-    const entry = this.ensureSession(sessionId);
+    const entry = await this.ensureSession(sessionId);
     const o = opts ?? entry.lastOpts;
     entry.lastOpts = o;
 
@@ -147,8 +158,8 @@ export class LocalPiProvider implements AgentProvider {
     if (entry) entry.handle.agent.abort();
   }
 
-  onEvent(sessionId: string, cb: (e: AgentEvent) => void): () => void {
-    const entry = this.ensureSession(sessionId);
+  async onEvent(sessionId: string, cb: (e: AgentEvent) => void): Promise<() => void> {
+    const entry = await this.ensureSession(sessionId);
     entry.listeners.add(cb);
     return () => entry.listeners.delete(cb);
   }

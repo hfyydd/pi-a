@@ -15,6 +15,7 @@
     "@earendil-works/pi-coding-agent": "npm:@earendil-works/pi-coding-agent@0.80.3",
     "typebox": "npm:typebox@1.1.38",
     "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@1.12.1",
+    "pdfjs-dist": "npm:pdfjs-dist@4.0.379",
     "@lydell/node-pty": "npm:@lydell/node-pty@1.2.0-beta.12",
     "keytar": "npm:keytar@7.9.0",
     "mammoth": "npm:mammoth@1.8.0",

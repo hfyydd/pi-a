@@ -103,7 +103,22 @@ export function initDb(): DatabaseSync {
       FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_versions_art ON artifact_versions(artifact_id);
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      dir_path TEXT DEFAULT '',
+      color TEXT DEFAULT '#3b82f6',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
+
+  // 补 conversations.project_id 列
+  addColumn("conversations", "project_id", "TEXT");
+  // 补 conversations.expert_id 列（专家模式）
+  addColumn("conversations", "expert_id", "TEXT");
 
   // 兼容旧库：补 category 列（已存在则跳过）
   addColumn("conversations", "category", "TEXT NOT NULL DEFAULT 'assistant'");

@@ -1,7 +1,6 @@
 // src/domains/doc/node/reader.ts
 // 文档读取引擎。对照 04 文档 §四：read_doc 工具的实现层。
-// 支持: txt/md/json/csv(纯文本) + docx(mammoth) + xlsx(exceljs) + pptx(pizzip)
-// pdf 暂不支持（pdf-parse 在 Deno 兼容性未验，P1）
+// 支持: txt/md/json/csv(纯文本) + docx(mammoth) + xlsx(exceljs) + pptx(pizzip) + pdf(pdfjs-dist)
 
 import Pizzip from "pizzip";
 
@@ -35,6 +34,8 @@ export async function readDoc(path: string): Promise<ReadResult> {
         return await readXlsx(path);
       case "pptx":
         return await readPptx(path);
+      case "pdf":
+        return await readPdf(path);
       default:
         // 未知扩展名尝试当文本读
         return await readText(path, "text");
@@ -164,4 +165,29 @@ async function readPptx(path: string): Promise<ReadResult> {
 
   const resultText = outline.length > 0 ? outline.join("\n\n") : "(空幻灯片文档)";
   return truncate(resultText, "pptx");
+}
+
+/** PDF：pdfjs-dist 提取文本 */
+async function readPdf(path: string): Promise<ReadResult> {
+  const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // 禁用 worker（Node/Deno 环境无 DOM worker）
+  if (pdfjs.GlobalWorkerOptions) {
+    pdfjs.GlobalWorkerOptions.workerSrc = "";
+  }
+  const data = new Uint8Array(await Deno.readFile(path));
+  const doc = await pdfjs.getDocument({ data, useWorker: false, isEvalSupported: false }).promise;
+  const pages: string[] = [];
+  const maxPages = Math.min(doc.numPages, 50); // 最多读 50 页
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item: any) => item.str || "")
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text) pages.push(`--- 第 ${i} 页 ---\n${text}`);
+  }
+  await doc.destroy();
+  return truncate(pages.join("\n\n") || "(空 PDF)", "pdf");
 }

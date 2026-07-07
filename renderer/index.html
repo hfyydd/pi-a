@@ -747,6 +747,9 @@
       <button class="icon-btn" id="btn-artifacts" title="工件" style="margin-left:4px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       </button>
+      <button class="icon-btn" id="btn-export" title="导出对话" style="margin-left:2px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </button>
     </header>
 
     <div id="chat"><div class="chat-inner" id="chat-inner"></div></div>
@@ -1357,10 +1360,37 @@
       await loadConversations(); if (!currentId) showWelcome();
     }
 
-    // ===== 事件轮询 =====
+    // ===== 事件流（SSE 实时推送，替代轮询） =====
+    let sseSource = null;
     function restartPolling() {
+      // 关闭旧的 SSE 连接
+      if (sseSource) { try { sseSource.close(); } catch {} sseSource = null; }
       if (pollTimer) clearInterval(pollTimer);
       if (!currentId) return;
+
+      // 优先用 SSE
+      try {
+        sseSource = new EventSource(API + "/api/events/" + currentId + "/stream");
+        sseSource.onmessage = (e) => {
+          try {
+            const ev = JSON.parse(e.data);
+            handleEvent(ev);
+          } catch {}
+        };
+        sseSource.onerror = () => {
+          // SSE 断开，降级到轮询
+          if (sseSource) { try { sseSource.close(); } catch {} sseSource = null; }
+          startFallbackPolling();
+        };
+        return;
+      } catch {
+        // EventSource 不可用，降级到轮询
+      }
+      startFallbackPolling();
+    }
+    // 轮询兜底（SSE 不可用时）
+    function startFallbackPolling() {
+      if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(async () => {
         if (!currentId) return;
         try {
@@ -2044,6 +2074,13 @@
       } catch (e) { console.error("工件加载失败:", e); }
     }
     $("btn-artifacts").onclick = toggleArtifacts;
+    // 导出对话
+    $("btn-export").onclick = () => {
+      if (!currentId) return alert("请先选择一个对话");
+      const fmt = prompt("导出格式：md / txt / json", "md") || "md";
+      if (!["md", "txt", "json"].includes(fmt)) return alert("不支持的格式");
+      window.open(API + "/api/conv/" + currentId + "/export?format=" + fmt, "_blank");
+    };
     $("ap-close").onclick = toggleArtifacts;
 
     // ===== @ 引用联想框交互逻辑 =====

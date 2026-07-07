@@ -31,6 +31,8 @@ import {
   moveConversation, deleteConversation, appendMessage, getMessages,
 } from "./src/domains/session/node/store.ts";
 import { listArtifacts, deleteArtifact } from "./src/domains/artifact/node/store.ts";
+import { createProject, listProjects, getProject, updateProject, deleteProject, assignConversationToProject, listProjectConversations } from "./src/domains/project/node/store.ts";
+import { BUILTIN_EXPERTS, getExpert } from "./src/agent/experts.ts";
 import { getApiKey } from "./src/infra/keychain.ts";
 
 initDb();
@@ -242,12 +244,11 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       provider.abort(b.sessionId);
       return json({ ok: true });
     }
-    // GET /api/events/:id
-    if (path.startsWith("/api/events/") && req.method === "GET") {
+    // GET /api/events/:id — 轮询（保留向后兼容，SSE 不可用时兜底）
+    if (path.startsWith("/api/events/") && !path.includes("/stream") && req.method === "GET") {
       const id = path.split("/")[3];
       const q = getQueue(id);
       const events = q.splice(0, q.length);
-      if (events.length > 0) console.log("[api] /api/events 返回", events.length, "个事件给", id.slice(0,8));
       for (const ev of events) {
         if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
           const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
@@ -257,6 +258,65 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         }
       }
       return json(events);
+    }
+    // GET /api/events/:id/stream — SSE 实时推送
+    if (path.startsWith("/api/events/") && path.endsWith("/stream") && req.method === "GET") {
+      const id = path.split("/")[3];
+      getQueue(id); // 确保队列已订阅
+
+      const body = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          const send = (data: unknown) => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          };
+
+          // 发送已有事件（队列里积攒的）
+          const q = getQueue(id);
+          const pending = q.splice(0, q.length);
+          for (const ev of pending) {
+            if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
+              const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+              if (text) appendMessage(id, "assistant", text);
+            } else if (ev.type === "tool_execution_end") {
+              appendMessage(id, "tool", `${(ev as any).toolName} ${(ev as any).isError ? "✗" : "✓"}`, { toolName: (ev as any).toolName, isError: (ev as any).isError });
+            }
+            send(ev);
+          }
+
+          // 订阅新事件（onEvent 是异步的，先注册回调）
+          let unsub: (() => void) | null = null;
+          provider.onEvent(id, (event) => {
+            if (event.type === "message_end" && (event as any).message?.role === "assistant") {
+              const text = ((event as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+              if (text) appendMessage(id, "assistant", text);
+            } else if (event.type === "tool_execution_end") {
+              appendMessage(id, "tool", `${(event as any).toolName} ${(event as any).isError ? "✗" : "✓"}`, { toolName: (event as any).toolName, isError: (event as any).isError });
+            }
+            send(event);
+          }).then((fn) => { unsub = fn; });
+
+          // 心跳（每 30 秒发 ping，保持连接）
+          const heartbeat = setInterval(() => {
+            try { controller.enqueue(encoder.encode(`: ping\n\n`)); } catch {}
+          }, 30000);
+
+          // 清理
+          req.signal.addEventListener("abort", () => {
+            clearInterval(heartbeat);
+            if (unsub) unsub();
+            try { controller.close(); } catch {}
+          });
+        },
+      });
+
+      return new Response(body, {
+        headers: {
+          "content-type": "text/event-stream",
+          "cache-control": "no-cache",
+          "connection": "keep-alive",
+        },
+      });
     }
     // POST /api/confirm  { requestId, approved }
     if (path === "/api/confirm" && req.method === "POST") {
@@ -414,6 +474,10 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           const { readDoc } = await import("./src/domains/doc/node/reader.ts");
           const result = await readDoc(filePath);
           return json({ kind: "pptx", text: result.text });
+        } else if (ext === "pdf") {
+          const { readDoc } = await import("./src/domains/doc/node/reader.ts");
+          const result = await readDoc(filePath);
+          return json({ kind: "pdf", text: result.text });
         } else if (ext === "md" || ext === "txt" || ext === "json") {
           const text = await Deno.readTextFile(filePath);
           return json({ kind: ext, text });
@@ -440,6 +504,96 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const tools = await connectAllMcpServers();
       setMcpTools(tools);
       return json({ ok: true, toolCount: tools.length });
+    }
+    // GET /api/conv/:id/export?format=md|txt|json — 导出对话
+    if (path.includes("/export") && path.startsWith("/api/conv/") && req.method === "GET") {
+      const parts = path.split("/");
+      const id = parts[3];
+      const format = new URL(req.url).searchParams.get("format") || "md";
+      const messages = getMessages(id);
+      const conv = listConversations().find((c: any) => c.id === id);
+      const title = conv?.title || "对话";
+
+      let content = "";
+      const filename = title.replace(/[\/\\:*?"<>|]/g, "_");
+
+      if (format === "json") {
+        content = JSON.stringify({ title, id, messages }, null, 2);
+      } else if (format === "txt") {
+        content = `${title}\n${"=".repeat(title.length)}\n\n`;
+        for (const m of messages) {
+          const who = m.role === "user" ? "我" : m.role === "assistant" ? "Pi-a" : `🔧 ${m.toolName || "工具"}`;
+          content += `[${who}]\n${m.content}\n\n`;
+        }
+      } else {
+        // markdown（默认）
+        content = `# ${title}\n\n`;
+        for (const m of messages) {
+          if (m.role === "user") {
+            content += `## 🧑 我\n\n${m.content}\n\n`;
+          } else if (m.role === "assistant") {
+            content += `## 🤖 Pi-a\n\n${m.content}\n\n`;
+          } else {
+            content += `**🔧 ${m.toolName || "工具"}** ${m.isError ? "✗" : "✓"}\n\n`;
+          }
+        }
+      }
+
+      const ext = format === "json" ? "json" : format === "txt" ? "txt" : "md";
+      return new Response(content, {
+        headers: {
+          "content-type": format === "json" ? "application/json" : "text/plain; charset=utf-8",
+          "content-disposition": `attachment; filename="${encodeURIComponent(filename)}.${ext}"`,
+        },
+      });
+    }
+    // ===== 项目 API =====
+    if (path === "/api/projects" && req.method === "GET") {
+      return json(listProjects());
+    }
+    if (path === "/api/projects" && req.method === "POST") {
+      const b = await req.json();
+      return json(createProject(b.name, b));
+    }
+    if (path.startsWith("/api/projects/") && !path.includes("/assign") && req.method === "GET") {
+      const id = path.split("/")[3];
+      const proj = getProject(id);
+      if (!proj) return json({ error: "项目不存在" });
+      const convs = listProjectConversations(id);
+      return json({ ...proj, conversations: convs });
+    }
+    if (path.startsWith("/api/projects/") && !path.includes("/assign") && req.method === "PUT") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      updateProject(id, b);
+      return json({ ok: true });
+    }
+    if (path.startsWith("/api/projects/") && !path.includes("/assign") && req.method === "DELETE") {
+      const id = path.split("/")[3];
+      deleteProject(id);
+      return json({ ok: true });
+    }
+    // POST /api/projects/:id/assign — 把会话归入项目 { conversationId }
+    if (path.includes("/assign") && path.startsWith("/api/projects/") && req.method === "POST") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      assignConversationToProject(b.conversationId, id);
+      return json({ ok: true });
+    }
+    // ===== 专家 API =====
+    // GET /api/experts — 列出所有专家
+    if (path === "/api/experts" && req.method === "GET") {
+      return json(BUILTIN_EXPERTS);
+    }
+    // POST /api/conv/:id/expert — 给会话切换专家 { expertId }
+    if (path.includes("/expert") && path.startsWith("/api/conv/") && req.method === "POST") {
+      const convId = path.split("/")[3];
+      const b = await req.json();
+      const expert = b.expertId ? getExpert(b.expertId) : undefined;
+      const db = (await import("./src/infra/db.ts")).getDb();
+      db.prepare("UPDATE conversations SET expert_id = ?, updated_at = ? WHERE id = ?")
+        .run(b.expertId || null, Date.now(), convId);
+      return json({ ok: true, expert: expert || null });
     }
     return new Response(JSON.stringify({ error: "not found" }), { status: 404, headers: { "content-type": "application/json" } });
   } catch (e) {
