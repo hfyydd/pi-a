@@ -1,0 +1,141 @@
+// src/agent/engine.ts
+// pi Agent 封装。对照 03 文档 §2.3：
+//   createModels + new Agent + streamFn + getApiKey + beforeToolCall + afterToolCall + subscribe
+// spike 验证：new Agent({...}) + 真实 DeepSeek 流式对话全通过
+
+import { Agent } from "@earendil-works/pi-agent-core";
+import type { AgentEvent, AgentTool } from "@earendil-works/pi-agent-core";
+import { getModels } from "./models.ts";
+import { getApiKey } from "../infra/keychain.ts";
+import { checkToolPermission, logToolCall } from "./permissions.ts";
+import { getTools } from "./tools/index.ts";
+
+const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
+
+<identity>
+你是用户的智能工作伙伴，能读写文件、执行命令、处理文档、记忆偏好。
+用户桌面路径：~/Desktop/（macOS）。
+回答用中文，简洁直接。
+</identity>
+
+<tools>
+你有以下工具：
+- read：读取文件内容（支持 ~ 路径）
+- write：写文件到任意路径（自动创建父目录）
+- edit：编辑已有文件
+- bash：执行 shell 命令（ls/mkdir/cp/mv 等）
+- memory_recall：读取长期记忆
+- memory_write：写入长期记忆（记住用户偏好和事实）
+</tools>
+
+<agent_loop>
+收到任务后按以下步骤执行：
+1. 理解：确认用户想要什么，必要时提问澄清
+2. 执行：用工具直接完成任务，不要让用户自己做
+3. 验证：确认操作成功（如创建文件后确认文件存在）
+4. 总结：简要告诉用户结果
+</agent_loop>
+
+<tool_usage_policy>
+- 主动用工具完成任务。用户说"建一个 txt"就用 write 创建，不要回复"你可以自己右键新建"。
+- 用户说"读一下某文件"就用 read 读取后总结，不要说"请把内容贴给我"。
+- 需要路径时优先用 ~/Desktop/、~/Documents/ 等标准路径。
+- 不确定文件位置时，先用 bash ls 查看，再操作。
+</tool_usage_policy>
+
+<file_safety>
+执行文件操作时遵守：
+- 禁止递归删除目录（rm -rf /、rm -rf ~）
+- 删除文件前先确认
+- 批量操作不超过 10 个文件
+- 移动/重命名前确保目标路径正确
+- 不修改系统关键文件（/etc、/System、/usr）
+</file_safety>
+
+<working_modes>
+- Craft 模式：直接执行任务，可读写文件、执行命令
+- Plan 模式：先分析、列方案，等用户确认后再执行
+- Ask 模式：只回答问题，不调用任何工具
+</working_modes>
+
+<memory>
+用户偏好和事实会通过 memory 工具存取。
+当用户说"记住我喜欢简洁风格"时，用 memory_write 存储。
+回答问题时如有相关记忆，用 memory_recall 查找。
+</memory>
+
+<result_presentation>
+- 回复简洁，避免冗长解释
+- 用 markdown 格式（标题/列表/代码块）
+- 执行了哪些操作简要说明
+- 文件路径用代码格式标注
+</result_presentation>
+`;
+
+export interface AgentHandle {
+  agent: Agent;
+  /** 推送事件给前端（由调用方注入） */
+  emit: (event: AgentEvent) => void;
+}
+
+/**
+ * 创建一个 pi Agent 实例。
+ * @param onEvent  事件回调（由 provider 注入，负责推送给前端）
+ * @param tools    可选：覆盖默认工具集
+ */
+export function createWorkBuddyAgent(
+  onEvent: (event: AgentEvent) => void,
+  opts?: {
+    modelProvider?: string;
+    modelId?: string;
+    systemPrompt?: string;
+    tools?: AgentTool<any>[];
+  },
+): AgentHandle {
+  const modelProvider = opts?.modelProvider ?? "deepseek";
+  const modelId = opts?.modelId ?? "deepseek-v4-flash";
+
+  const models = getModels();
+  const model = models.getModel(modelProvider, modelId);
+  if (!model) {
+    throw new Error(
+      `模型 ${modelProvider}/${modelId} 未注册。可用: ${
+        JSON.stringify(models.getModels(modelProvider)?.map((m: any) => m.id) ?? [])
+      }`,
+    );
+  }
+
+  const tools = opts?.tools ?? getTools();
+
+  const agent = new Agent({
+    initialState: {
+      model,
+      systemPrompt: opts?.systemPrompt ?? SYSTEM_PROMPT,
+      tools,
+    },
+    // LLM 流式：经 Models（Deno 原生 fetch，无 CORS）
+    streamFn: (m, ctx, o) => models.streamSimple(m, ctx, o),
+    // API key 走 keychain（带 env 兜底）
+    getApiKey: async (provider: string) => (await getApiKey(provider)) ?? undefined,
+    // 权限钩子：beforeToolCall（按会话权限级别 + 工具类型决定放行/确认/拦截）
+    beforeToolCall: async (ctx) => {
+      const sessionId = (agent as any).__sessionId as string | undefined;
+      const perm = (agent as any).__perm as "default" | "full" | undefined;
+      const d = await checkToolPermission(sessionId ?? "", perm ?? "default", ctx.toolCall.name, ctx.args);
+      if (d.allow) return undefined;
+      return { block: true, reason: d.reason };
+    },
+    // 审计钩子：afterToolCall（落 SQLite）
+    afterToolCall: async (ctx) => {
+      await logToolCall(ctx.toolCall.name, ctx.args, ctx.isError);
+    },
+    toolExecution: "parallel",
+  });
+
+  // 订阅事件流 → 经 onEvent 推给前端
+  agent.subscribe(async (event: AgentEvent) => {
+    onEvent(event);
+  });
+
+  return { agent, emit: onEvent };
+}

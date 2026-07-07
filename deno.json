@@ -1,0 +1,30 @@
+{
+  "name": "pi-a",
+  "version": "0.0.1",
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "dev": "deno run --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-sys --allow-run --allow-scripts main.ts",
+    "desktop": "deno desktop --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-sys --allow-run --allow-scripts main.ts",
+    "build": "deno desktop --output Pi-a.app --allow-read --allow-write --allow-env --allow-net --allow-ffi --allow-sys --allow-run --allow-scripts main.ts",
+    "gen:renderer": "node -e \"const fs=require('fs');const h=fs.readFileSync('renderer/index.html','utf8');fs.mkdirSync('src/ui',{recursive:true});fs.writeFileSync('src/ui/renderer.ts','// AUTO-GENERATED — 源文件 renderer/index.html，改 HTML 后用 deno task gen:renderer 重新生成\\nexport const RENDERER_HTML = '+JSON.stringify(h)+';\\n');console.log('renderer.ts 已生成');\""
+  },
+  "imports": {
+    "@earendil-works/pi-agent-core": "npm:@earendil-works/pi-agent-core@0.80.3",
+    "@earendil-works/pi-ai": "npm:@earendil-works/pi-ai@0.80.3",
+    "@earendil-works/pi-ai/providers/deepseek": "npm:@earendil-works/pi-ai@0.80.3/providers/deepseek",
+    "@earendil-works/pi-coding-agent": "npm:@earendil-works/pi-coding-agent@0.80.3",
+    "typebox": "npm:typebox@1.1.38",
+    "@lydell/node-pty": "npm:@lydell/node-pty@1.2.0-beta.12",
+    "keytar": "npm:keytar@7.9.0",
+    "mammoth": "npm:mammoth@1.8.0",
+    "exceljs": "npm:exceljs@4.4.0",
+    "pptxgenjs": "npm:pptxgenjs@3.12.0",
+    "docx": "npm:docx@9.0.3",
+    "docxtemplater": "npm:docxtemplater@3.50.0",
+    "pizzip": "npm:pizzip@3.1.8"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.ns", "esnext"],
+    "strict": true
+  }
+}

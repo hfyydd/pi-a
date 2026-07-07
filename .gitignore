@@ -1,0 +1,34 @@
+# Deno
+.deno/
+deno.lock
+
+# node_modules（deno 自动管理，不入库）
+node_modules/
+
+# 构建产物
+*.app/
+*.dylib
+*.dylib.tmp-*
+
+# 自动生成的文件
+src/ui/renderer.ts
+
+# 本地配置
+.env
+.env.*
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试临时文件
+test_run.ts
+test_llm.ts
+test_mode.ts
+verify.ts

@@ -1,0 +1,12 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "sqlite": "deno run --allow-read --allow-env --allow-ffi test_sqlite.ts",
+    "pi": "deno run --allow-read --allow-env --allow-net test_pi.ts"
+  },
+  "imports": {
+    "better-sqlite3": "npm:better-sqlite3@12.8.0",
+    "@lydell/node-pty": "npm:@lydell/node-pty@1.2.0-beta.12",
+    "keytar": "npm:keytar@7.9.0"
+  }
+}
