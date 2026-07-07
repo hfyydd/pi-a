@@ -8,6 +8,8 @@ import type { AgentEvent, AgentTool } from "@earendil-works/pi-agent-core";
 export type { AgentEvent };
 import { createWorkBuddyAgent, type AgentHandle } from "./engine.ts";
 import { getFullTools, getReadOnlyTools } from "./tools/index.ts";
+import { getDb } from "../infra/db.ts";
+import { updateConversationStatus } from "../domains/session/node/store.ts";
 
 /** 执行模式：Ask=仅问答 / Plan=先方案 / Craft=直接执行 */
 export type RunMode = "ask" | "plan" | "craft";
@@ -74,6 +76,11 @@ export class LocalPiProvider implements AgentProvider {
     let entry = this.sessions.get(sessionId);
     if (!entry) {
       const listeners = new Set<(e: AgentEvent) => void>();
+      
+      // 查询会话的模型配置
+      const db = getDb();
+      const conv = db.prepare("SELECT model_provider, model_id FROM conversations WHERE id = ?").get(sessionId) as { model_provider: string; model_id: string } | undefined;
+      
       const handle = createWorkBuddyAgent((event) => {
         // 广播给该会话的所有监听者
         for (const cb of listeners) {
@@ -83,10 +90,13 @@ export class LocalPiProvider implements AgentProvider {
             console.error("[provider] 事件监听器异常:", e);
           }
         }
+      }, {
+        modelProvider: conv?.model_provider || "deepseek",
+        modelId: conv?.model_id || "deepseek-v4-flash",
       });
       entry = { handle, listeners, lastOpts: DEFAULT_OPTS };
       this.sessions.set(sessionId, entry);
-      console.log(`[provider] 创建会话 ${sessionId}`);
+      console.log(`[provider] 创建会话 ${sessionId} (模型: ${conv?.model_provider || "deepseek"}/${conv?.model_id || "deepseek-v4-flash"})`);
     }
     return entry;
   }
@@ -106,10 +116,15 @@ export class LocalPiProvider implements AgentProvider {
     (agent as any).__perm = o.permission;
     (agent as any).__sessionId = sessionId;
 
+    // 标记会话为运行中
+    updateConversationStatus(sessionId, "running");
+
     agent.prompt(text).then(() => {
       console.log(`[provider] 会话 ${sessionId} prompt 完成`);
+      updateConversationStatus(sessionId, "done");
     }).catch((e) => {
       console.error(`[provider] 会话 ${sessionId} prompt 失败:`, e?.message || e);
+      updateConversationStatus(sessionId, "failed");
     });
   }
 

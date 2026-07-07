@@ -53,7 +53,8 @@ export async function writeDocx(
 
 // ===== xlsx 创建 =====
 export async function writeXlsx(sheets: XlsxSheet[], fileName: string): Promise<string> {
-  const ExcelJS = await import("exceljs");
+  const excelMod = await import("exceljs");
+  const ExcelJS = (excelMod as any).default || excelMod;
   // @ts-ignore
   const workbook = new ExcelJS.Workbook();
   for (const s of sheets) {

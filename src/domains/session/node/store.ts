@@ -7,6 +7,7 @@ export interface Conversation {
   id: string;
   title: string;
   category: string; // assistant | project | expert | automation
+  status: string;   // idle | running | done | failed | pending | planning
   modelProvider: string;
   modelId: string;
   createdAt: number;
@@ -33,22 +34,34 @@ export function createConversation(title = "新对话", category = "assistant"):
   const db = getDb();
   const id = uuid();
   const now = Date.now();
+  
+  // 查询全局默认模型设置
+  let provider = "deepseek";
+  let modelId = "deepseek-v4-flash";
+  try {
+    const rowProv = db.prepare("SELECT value FROM settings WHERE key = 'default_provider'").get() as { value: string } | undefined;
+    const rowModel = db.prepare("SELECT value FROM settings WHERE key = 'default_model_id'").get() as { value: string } | undefined;
+    if (rowProv) provider = rowProv.value;
+    if (rowModel) modelId = rowModel.value;
+  } catch { /* 表不存在或未初始化 */ }
+
   db.prepare(
-    "INSERT INTO conversations (id, title, category, model_provider, model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(id, title, category, "deepseek", "deepseek-v4-flash", now, now);
-  return { id, title, category, modelProvider: "deepseek", modelId: "deepseek-v4-flash", createdAt: now, updatedAt: now };
+    "INSERT INTO conversations (id, title, category, status, model_provider, model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(id, title, category, "idle", provider, modelId, now, now);
+  return { id, title, category, status: "idle", modelProvider: provider, modelId: modelId, createdAt: now, updatedAt: now };
 }
 
-/** 列出会话（可按分类筛选 + 关键词搜索，按更新时间倒序） */
-export function listConversations(category?: string, search?: string): Conversation[] {
+/** 列出会话（可按分类/状态筛选 + 关键词搜索，按更新时间倒序） */
+export function listConversations(category?: string, search?: string, status?: string): Conversation[] {
   const db = getDb();
   const conds: string[] = [];
   const params: unknown[] = [];
   if (category && category !== "all") { conds.push("category = ?"); params.push(category); }
   if (search && search.trim()) { conds.push("LOWER(title) LIKE ?"); params.push(`%${search.trim().toLowerCase()}%`); }
+  if (status && status !== "all") { conds.push("status = ?"); params.push(status); }
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
   const stmt = db.prepare(
-    `SELECT id, title, category, model_provider as modelProvider, model_id as modelId, created_at as createdAt, updated_at as updatedAt FROM conversations ${where} ORDER BY updated_at DESC`,
+    `SELECT id, title, category, status, model_provider as modelProvider, model_id as modelId, created_at as createdAt, updated_at as updatedAt FROM conversations ${where} ORDER BY updated_at DESC`,
   );
   const rows = stmt.all(...(params as any[])) as unknown as Conversation[];
   return rows;
@@ -77,6 +90,12 @@ export function deleteConversation(id: string): void {
 export function touchConversation(id: string): void {
   const db = getDb();
   db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(Date.now(), id);
+}
+
+/** 更新会话状态 */
+export function updateConversationStatus(id: string, status: string): void {
+  const db = getDb();
+  db.prepare("UPDATE conversations SET status = ?, updated_at = ? WHERE id = ?").run(status, Date.now(), id);
 }
 
 /** 记录一条消息 */

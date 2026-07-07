@@ -9,6 +9,7 @@ import { getModels } from "./models.ts";
 import { getApiKey } from "../infra/keychain.ts";
 import { checkToolPermission, logToolCall } from "./permissions.ts";
 import { getTools } from "./tools/index.ts";
+import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
 
 const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
 
@@ -24,6 +25,10 @@ const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所
 - write：写文件到任意路径（自动创建父目录）
 - edit：编辑已有文件
 - bash：执行 shell 命令（ls/mkdir/cp/mv 等）
+- read_doc：读取文档（docx/xlsx/csv 结构化解析，比 read 更适合 Office 文件）
+- write_docx：生成 Word 文档（提供标题和章节）
+- write_xlsx：生成 Excel 表格（提供工作表和行列数据）
+- write_pptx：生成 PPT 演示文稿（提供幻灯片标题和要点）
 - memory_recall：读取长期记忆
 - memory_write：写入长期记忆（记住用户偏好和事实）
 </tools>
@@ -107,10 +112,14 @@ export function createWorkBuddyAgent(
 
   const tools = opts?.tools ?? getTools();
 
+  // 注入技能提示词
+  const skillsPrompt = loadSkillsPrompt();
+  const fullSystemPrompt = (opts?.systemPrompt ?? SYSTEM_PROMPT) + skillsPrompt;
+
   const agent = new Agent({
     initialState: {
       model,
-      systemPrompt: opts?.systemPrompt ?? SYSTEM_PROMPT,
+      systemPrompt: fullSystemPrompt,
       tools,
     },
     // LLM 流式：经 Models（Deno 原生 fetch，无 CORS）

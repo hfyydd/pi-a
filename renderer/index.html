@@ -284,6 +284,8 @@
     .conv-ttl { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 450; }
     .conv-item.active .conv-ttl { color: var(--text); font-weight: 550; }
     .conv-time { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+    .conv-status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .conv-status-dot[style*="#3b82f6"] { animation: thinkpulse 1s ease-in-out infinite; }
     .conv-del {
       opacity: 0; width: 20px; height: 20px; flex-shrink: 0;
       border-radius: 5px; border: none; background: transparent;
@@ -318,6 +320,46 @@
 
     /* ===== 主区 ===== */
     #main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); position: relative; }
+
+    /* ===== 工件面板（右侧抽屉） ===== */
+    .artifact-panel {
+      width: 0; flex-shrink: 0; overflow: hidden;
+      background: var(--bg-sidebar); border-left: 1px solid var(--border);
+      transition: width .2s ease;
+      display: flex; flex-direction: column;
+    }
+    .artifact-panel.show { width: 280px; }
+    .ap-head {
+      height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+      padding: 0 14px; border-bottom: 1px solid var(--border-soft);
+    }
+    .ap-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+    .ap-close {
+      width: 26px; height: 26px; border: none; background: transparent;
+      border-radius: 6px; cursor: pointer; color: var(--text-3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ap-close:hover { background: var(--bg-hover); color: var(--text); }
+    .ap-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .ap-item {
+      padding: 10px 12px; border-radius: var(--r-sm); cursor: pointer;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+      transition: background .1s;
+    }
+    .ap-item:hover { background: var(--bg-hover); }
+    .ap-icon {
+      width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 600;
+    }
+    .ap-icon.docx { background: var(--blue-soft); color: var(--blue-text); }
+    .ap-icon.xlsx { background: var(--green-soft); color: var(--green-text); }
+    .ap-icon.pptx { background: #fef3c7; color: #92400e; }
+    .ap-icon.other { background: var(--bg-subtle); color: var(--text-3); }
+    .ap-info { flex: 1; min-width: 0; }
+    .ap-name { font-size: 12.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ap-meta { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+    .ap-empty { padding: 40px 20px; text-align: center; color: var(--text-3); font-size: 12.5px; line-height: 1.8; }
     .topbar {
       -webkit-app-region: drag;
       height: 40px; flex-shrink: 0;
@@ -513,6 +555,100 @@
     .has-pop { /* 不再需要 position:relative */ }
 
     .composer-meta { max-width: 760px; margin: 7px auto 0; font-size: 10.5px; color: var(--text-3); text-align: center; }
+
+    /* ===== 通用大弹窗与设置/预览布局 ===== */
+    .large-modal {
+      width: 820px; max-width: 95vw; height: 560px; max-height: 85vh;
+      background: var(--bg); border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      display: flex; flex-direction: column; overflow: hidden;
+      border: 1px solid var(--border-strong);
+    }
+    .large-modal-head {
+      height: 52px; flex-shrink: 0; border-bottom: 1px solid var(--border-soft);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; background: var(--bg);
+    }
+    .large-modal-title {
+      font-size: 15px; font-weight: 650; color: var(--text);
+    }
+    .large-modal-close {
+      width: 28px; height: 28px; border: none; background: transparent;
+      border-radius: 6px; cursor: pointer; color: var(--text-3);
+      display: flex; align-items: center; justify-content: center;
+      transition: all .12s;
+    }
+    .large-modal-close:hover { background: var(--bg-hover); color: var(--text); }
+    .large-modal-body {
+      flex: 1; overflow: hidden; display: flex;
+    }
+
+    /* 设置导航与内容 */
+    .settings-sidebar {
+      width: 170px; background: var(--bg-subtle); border-right: 1px solid var(--border-soft);
+      padding: 12px 8px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0;
+    }
+    .settings-tab {
+      padding: 8px 12px; border-radius: 6px; border: none; background: transparent;
+      text-align: left; font-size: 13px; color: var(--text-2); cursor: pointer;
+      transition: all .12s; display: flex; align-items: center; gap: 8px;
+      font-family: inherit;
+    }
+    .settings-tab:hover { background: var(--bg-hover); color: var(--text); }
+    .settings-tab.active { background: var(--bg-active); color: var(--accent); font-weight: 600; }
+    .settings-content {
+      flex: 1; padding: 20px 24px; overflow-y: auto; display: none;
+    }
+    .settings-content.active { display: block; }
+    
+    /* 预览面板布局 */
+    .preview-layout {
+      display: flex; width: 100%; height: 100%;
+    }
+    .preview-viewer {
+      flex: 1; padding: 20px; overflow-y: auto; background: var(--bg);
+    }
+    .preview-viewer table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12.5px; }
+    .preview-viewer th, .preview-viewer td { border: 1px solid var(--border-strong); padding: 8px 10px; text-align: left; }
+    .preview-viewer th { background: var(--bg-subtle); font-weight: 600; }
+    .preview-viewer pre { font-family: var(--mono); font-size: 12.5px; background: var(--bg-subtle); padding: 12px; border-radius: 8px; border: 1px solid var(--border-soft); white-space: pre-wrap; word-break: break-all; }
+    
+    .preview-versions {
+      width: 200px; border-left: 1px solid var(--border-soft); background: var(--bg-subtle);
+      padding: 12px 8px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex-shrink: 0;
+    }
+    .version-item {
+      padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border-strong);
+      cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: all .12s;
+    }
+    .version-item:hover { border-color: var(--accent); }
+    .version-item.active { border-color: var(--accent); background: var(--accent-soft); }
+    .version-item .v-num { font-size: 11.5px; font-weight: 650; color: var(--text); }
+    .version-item .v-time { font-size: 10.5px; color: var(--text-3); }
+    .version-item .v-restore {
+      margin-top: 4px; padding: 3px 6px; border: 1px solid var(--border-strong);
+      background: var(--bg); border-radius: 4px; font-size: 10.5px; cursor: pointer; text-align: center;
+      transition: all .12s; font-family: inherit; font-weight: 500;
+    }
+    .version-item .v-restore:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    
+    /* 技能菜单样式 */
+    .skill-pop {
+      position: fixed;
+      background: var(--bg); border: 1px solid var(--border-strong);
+      border-radius: var(--r); box-shadow: var(--shadow-lg);
+      padding: 6px; min-width: 280px; z-index: 9999;
+      display: none;
+    }
+    .skill-pop.show { display: block; }
+    .skill-item {
+      padding: 8px 10px; border-radius: 7px; cursor: pointer; display: flex; gap: 9px; align-items: flex-start;
+      transition: background .1s; margin-bottom: 1px;
+    }
+    .skill-item:hover { background: var(--bg-hover); }
+    .skill-item .sk-icon { font-size: 16px; margin-top: 2px; flex-shrink: 0; }
+    .skill-item .sk-title { font-size: 12.5px; font-weight: 550; color: var(--text); }
+    .skill-item .sk-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -587,6 +723,9 @@
       </button>
       <span class="top-title" id="conv-title">新对话</span>
       <span class="model-badge"><span class="dot-i"></span> deepseek-v4-flash</span>
+      <button class="icon-btn" id="btn-artifacts" title="工件" style="margin-left:4px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      </button>
     </header>
 
     <div id="chat"><div class="chat-inner" id="chat-inner"></div></div>
@@ -673,6 +812,145 @@
     </div>
   </main>
 
+  <!-- ===== 工件面板（右侧抽屉） ===== -->
+  <aside class="artifact-panel" id="artifact-panel">
+    <div class="ap-head">
+      <span class="ap-title">工件</span>
+      <button class="ap-close" id="ap-close" title="关闭">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="ap-list" id="ap-list">
+      <div class="ap-empty">还没有工件<br>让 Pi-a 生成文档后会出现在这里</div>
+    </div>
+  </aside>
+
+  <!-- 设置弹窗 -->
+  <div class="modal-overlay" id="settings-modal-overlay">
+    <div class="large-modal">
+      <div class="large-modal-head">
+        <span class="large-modal-title">系统设置</span>
+        <button class="large-modal-close" id="btn-close-settings" title="关闭">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="large-modal-body">
+        <!-- 侧边栏导航 -->
+        <div class="settings-sidebar">
+          <button class="settings-tab active" data-tab="tab-model">🤖 模型配置</button>
+          <button class="settings-tab" data-tab="tab-keys">🔑 API Keys</button>
+          <button class="settings-tab" data-tab="tab-general">⚙️ 常规设置</button>
+          <button class="settings-tab" data-tab="tab-memory">🧠 长期记忆</button>
+        </div>
+        <!-- 内容区域 -->
+        <div class="settings-content active" id="tab-model">
+          <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;">默认模型选择</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;max-width:400px;margin-bottom:20px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:12px;color:var(--text-3);">服务商 (Provider)</label>
+              <select id="set-provider" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-family:inherit;outline:none;"></select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:12px;color:var(--text-3);">默认模型 (Model ID)</label>
+              <select id="set-model" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-family:inherit;outline:none;"></select>
+            </div>
+          </div>
+          <button class="cd-btn cd-allow" id="btn-save-model" style="padding:6px 14px;border-radius:6px;font-size:12px;">保存模型配置</button>
+        </div>
+        
+        <div class="settings-content" id="tab-keys">
+          <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;">API Key 存储管理</h3>
+          <p style="font-size:12px;color:var(--text-3);margin-bottom:14px;">密钥保存在系统钥匙串中，安全加密不落地。</p>
+          <div id="keys-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
+        <div class="settings-content" id="tab-general">
+          <h3 style="margin-bottom:14px;font-size:14px;font-weight:600;">常规选项</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;max-width:500px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:12px;color:var(--text-3);">文档工作目录</label>
+              <input type="text" id="set-docs-dir" style="padding:7px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;outline:none;" />
+              <span style="font-size:11px;color:var(--text-3);">Agent 读写文档的基准访问路径，默认: ~/Desktop</span>
+            </div>
+          </div>
+          <button class="cd-btn cd-allow" id="btn-save-general" style="padding:6px 14px;border-radius:6px;font-size:12px;margin-top:16px;">保存配置</button>
+        </div>
+
+        <div class="settings-content" id="tab-memory" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
+          <h3 style="margin-bottom:10px;font-size:14px;font-weight:600;">长期记忆管理</h3>
+          <!-- 手动添加记忆 -->
+          <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;background:var(--bg-subtle);padding:10px;border-radius:8px;flex-shrink:0;">
+            <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+              <label style="font-size:11px;color:var(--text-3);">记忆内容</label>
+              <input type="text" id="mem-content" placeholder="输入你想让 Agent 记住的事实或偏好..." style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;width:100px;flex-shrink:0;">
+              <label style="font-size:11px;color:var(--text-3);">类别</label>
+              <select id="mem-kind" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;">
+                <option value="fact">事实</option>
+                <option value="preference">偏好</option>
+                <option value="note">笔记</option>
+              </select>
+            </div>
+            <button class="cd-btn cd-allow" id="btn-add-mem" style="padding:6px 12px;border-radius:6px;font-size:12.5px;height:31px;white-space:nowrap;flex-shrink:0;">添加</button>
+          </div>
+          <!-- 记忆列表 -->
+          <div style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="memories-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 文档预览弹窗 -->
+  <div class="modal-overlay" id="preview-modal-overlay">
+    <div class="large-modal" style="width: 900px; height: 620px;">
+      <div class="large-modal-head">
+        <div style="min-width:0;flex:1;padding-right:12px;">
+          <span class="large-modal-title" id="prev-title">文档预览</span>
+          <span style="font-size:11px;color:var(--text-3);margin-left:8px;display:inline-block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" id="prev-path"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <button class="cd-btn" id="btn-prev-open" style="padding:4px 10px;font-size:12px;border-radius:5px;">在外部打开</button>
+          <button class="large-modal-close" id="btn-close-prev" title="关闭">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="large-modal-body" style="overflow:hidden;">
+        <div class="preview-layout" style="display:flex;width:100%;height:100%;">
+          <!-- 内容区 -->
+          <div class="preview-viewer" id="prev-viewer" style="flex:1;padding:20px;overflow-y:auto;"></div>
+          <!-- 版本管理 -->
+          <div class="preview-versions" id="prev-versions"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 内置技能快捷菜单 -->
+  <div class="skill-pop" id="skill-menu">
+    <div class="skill-item" data-q="帮我生成一份周报 docx，标题是「产品工作周报」，包含一个章节「本周进展」要点：[填入进展]，以及章节「下周计划」：[填入计划]。文件名选 周报.docx。">
+      <span class="sk-icon">📊</span>
+      <div><div class="sk-title">周报/月报生成</div><div class="sk-desc">一键从大纲要点生成结构化周报 Word</div></div>
+    </div>
+    <div class="skill-item" data-q="读一下 ~/Desktop/[输入文件名].xlsx 并整理一份销售数据分析摘要。">
+      <span class="sk-icon">📈</span>
+      <div><div class="sk-title">数据分析出表</div><div class="sk-desc">读取表格并提炼关键数据洞察</div></div>
+    </div>
+    <div class="skill-item" data-q="帮我做一个 PPT 演示文稿，主题是「[输入主题]」，包含 4 页幻灯片，分别是封面、背景介绍、核心方案、总结。文件名选 演示文稿.pptx。">
+      <span class="sk-icon">🎨</span>
+      <div><div class="sk-title">PPT 制作</div><div class="sk-desc">根据大纲要点生成格式规范的 PPT</div></div>
+    </div>
+    <div class="skill-item" data-q="读一下 ~/Desktop/[输入文件名].docx，帮我润色和优化里面的表达，改善逻辑结构，使其更加专业流畅。">
+      <span class="sk-icon">📝</span>
+      <div><div class="sk-title">文档润色</div><div class="sk-desc">精细改写、优化用词与排版</div></div>
+    </div>
+    <div class="skill-item" data-q="读一下 ~/Desktop/[输入文件名].docx，并回答我的问题：[输入问题]">
+      <span class="sk-icon">🔍</span>
+      <div><div class="sk-title">文档问答 (RAG)</div><div class="sk-desc">针对本地长文档进行精准搜索问答</div></div>
+    </div>
+  </div>
+
   <!-- 居中搜索对话框（查询历史） -->
   <div class="modal-overlay" id="search-modal-overlay">
     <div class="search-modal">
@@ -757,6 +1035,7 @@
           const p = new URLSearchParams();
           if (args[0]) p.set("category", args[0]);
           if (args[1]) p.set("search", args[1]);
+          if (args[2]) p.set("status", args[2]);
           return apiGet("/api/conv?" + p.toString());
         }
         case "createConversation": return apiPost("/api/conv", { title: args[0], category: args[1] });
@@ -878,6 +1157,10 @@
       const status = card.querySelector(".tool-status");
       if (status) status.textContent = isError ? "失败" : "完成";
       scrollBottom();
+      // 文档工具完成后刷新工件面板
+      if (!isError && ["write_docx","write_xlsx","write_pptx"].includes(name)) {
+        if (artPanel.classList.contains("show")) loadArtifacts();
+      }
     }
     function addToolLegacy(name, isError) {
       const row = document.createElement("div"); row.className = "row assistant tool-row";
@@ -928,7 +1211,7 @@
     // ===== 会话列表 =====
     async function loadConversations() {
       let list;
-      try { list = await callBinding("listConversations", [activeCat, searchTerm]); }
+      try { list = await callBinding("listConversations", [activeCat, searchTerm, filterStatus !== "all" ? filterStatus : undefined]); }
       catch (e) {
         console.error("[loadConversations] 调用失败:", e?.message || e);
         return;
@@ -957,9 +1240,11 @@
           item.className = "conv-item" + (c.id === currentId ? " active" : "");
           item.dataset.id = c.id;
           item.style.setProperty("--cat-color", CAT_COLORS[c.category] || CAT_COLORS.assistant);
+          const statusColors = { idle: "var(--text-4)", running: "#3b82f6", done: "var(--green)", failed: "var(--red)", pending: "var(--text-3)", planning: "var(--amber)" };
+          const statusDot = c.status && c.status !== "idle" ? `<span class="conv-status-dot" style="background:${statusColors[c.status] || "var(--text-4)"}" title="${c.status}"></span>` : "";
           item.innerHTML =
             `<div class="conv-main">
-               <div class="conv-ttl">${esc(c.title || "新对话")}</div>
+               <div class="conv-ttl">${statusDot}${esc(c.title || "新对话")}</div>
                <div class="conv-time">${timeAgo(c.updatedAt)}</div>
              </div>
              <button class="conv-del" title="删除"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>`;
@@ -1131,6 +1416,354 @@
       $("perm-menu").classList.remove("show");
     }
 
+    // ===== Settings Modal Logic =====
+    const setModal = $("settings-modal-overlay"), closeSetBtn = $("btn-close-settings");
+    const providerSelect = $("set-provider"), modelSelect = $("set-model"), saveModelBtn = $("btn-save-model");
+    const docsDirInput = $("set-docs-dir"), saveGenBtn = $("btn-save-general");
+    const keysList = $("keys-list");
+    const memContentInput = $("mem-content"), memKindSelect = $("mem-kind"), addMemBtn = $("btn-add-mem"), memsContainer = $("memories-container");
+
+    // 为 sidebar 下方的“设置”图标按钮绑定 ID 和点击事件
+    const setBtn = document.querySelector('aside .side-foot button[title="设置"]');
+    if (setBtn) {
+      setBtn.id = "btn-settings";
+      setBtn.onclick = openSettings;
+    }
+
+    async function openSettings() {
+      setModal.classList.add("show");
+      // 获取全局配置
+      const cfg = await apiGet("/api/settings");
+      
+      // 渲染 Provider 选择列表
+      providerSelect.innerHTML = "";
+      cfg.providers.forEach(p => {
+        const opt = document.createElement("option"); opt.value = p.provider; opt.textContent = p.label;
+        providerSelect.appendChild(opt);
+      });
+      providerSelect.value = cfg.defaultProvider;
+
+      // 联动渲染 Model 列表
+      function updateModelOptions(prov) {
+        modelSelect.innerHTML = "";
+        const pObj = cfg.providers.find(p => p.provider === prov);
+        if (pObj) {
+          pObj.models.forEach(m => {
+            const opt = document.createElement("option"); opt.value = m.id; opt.textContent = m.id;
+            modelSelect.appendChild(opt);
+          });
+          modelSelect.value = cfg.defaultModelId;
+        }
+      }
+      providerSelect.onchange = (e) => updateModelOptions(e.target.value);
+      updateModelOptions(cfg.defaultProvider);
+
+      // 工作目录
+      docsDirInput.value = cfg.docsDir;
+
+      // 渲染 API Keys 状态
+      await renderKeysList();
+
+      // 渲染长期记忆
+      await renderMemories();
+    }
+
+    closeSetBtn.onclick = () => setModal.classList.remove("show");
+
+    // 选项卡切换
+    setModal.querySelectorAll(".settings-sidebar .settings-tab").forEach(tab => {
+      tab.onclick = () => {
+        setModal.querySelectorAll(".settings-sidebar .settings-tab").forEach(t => t.classList.remove("active"));
+        setModal.querySelectorAll(".settings-content").forEach(c => c.classList.remove("active"));
+        tab.classList.add("active");
+        $(tab.dataset.tab).classList.add("active");
+      };
+    });
+
+    // 保存模型设置
+    saveModelBtn.onclick = async () => {
+      await apiPost("/api/settings", {
+        defaultProvider: providerSelect.value,
+        defaultModelId: modelSelect.value
+      });
+      alert("默认模型配置已保存");
+      document.querySelector(".model-badge").innerHTML = `<span class="dot-i"></span> ${modelSelect.value}`;
+    };
+
+    // 保存常规设置
+    saveGenBtn.onclick = async () => {
+      await apiPost("/api/settings", {
+        docsDir: docsDirInput.value
+      });
+      alert("常规选项已保存");
+    };
+
+    // 渲染 API Keys 管理列表
+    async function renderKeysList() {
+      const keysState = await apiGet("/api/settings/keys");
+      keysList.innerHTML = "";
+      for (const [p, hasKey] of Object.entries(keysState)) {
+        const label = { deepseek: "DeepSeek", moonshot: "Kimi (月之暗面)", zai: "ZAI (阶跃星辰)", minimax: "MiniMax", antling: "蚂蚁百灵", xiaomi: "小米" }[p] || p;
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--border-soft);background:var(--bg-subtle);border-radius:8px;";
+        row.innerHTML = `
+          <div>
+            <div style="font-weight:600;font-size:13px;">${esc(label)}</div>
+            <div style="font-size:11.5px;color:${hasKey ? "var(--green)" : "var(--text-3)"}">${hasKey ? "✓ 已配置密钥" : "未配置密钥"}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="password" id="key-input-${p}" placeholder="${hasKey ? "••••••••••••••••" : "输入 API Key"}" style="padding:4px 8px;font-size:12px;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg);color:var(--text);width:160px;outline:none;" />
+            <button class="cd-btn cd-allow" style="padding:4px 10px;font-size:11.5px;border-radius:5px;cursor:pointer;" onclick="saveKey('${p}')">保存</button>
+            ${hasKey ? `<button class="cd-btn" style="padding:4px 10px;font-size:11.5px;border-radius:5px;cursor:pointer;" onclick="deleteKey('${p}')">清除</button>` : ""}
+          </div>
+        `;
+        keysList.appendChild(row);
+      }
+    }
+
+    window.saveKey = async (providerId) => {
+      const input = $(`key-input-${providerId}`);
+      if (!input.value.trim()) return alert("请输入 API Key");
+      await apiPost("/api/settings/keys", { provider: providerId, key: input.value.trim() });
+      input.value = "";
+      await renderKeysList();
+      alert(`${providerId} API Key 保存成功`);
+    };
+
+    window.deleteKey = async (providerId) => {
+      if (!confirm(`确认清除 ${providerId} 的 API Key 吗？`)) return;
+      await apiDelete(`/api/settings/keys/${providerId}`);
+      await renderKeysList();
+      alert(`${providerId} API Key 已成功清除`);
+    };
+
+    // 长期记忆加载与维护
+    async function renderMemories() {
+      const list = await apiGet("/api/memories");
+      memsContainer.innerHTML = "";
+      if (list.length === 0) {
+        memsContainer.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-size:12.5px;">暂无长期记忆。<br>可以在上方手动录入，或在对话中指示 Agent 记住。</div>`;
+        return;
+      }
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12.5px;";
+      table.innerHTML = `
+        <thead>
+          <tr style="background:var(--bg-subtle);border-bottom:1px solid var(--border-soft);">
+            <th style="padding:8px;text-align:left;width:70px;">类别</th>
+            <th style="padding:8px;text-align:left;">记忆内容</th>
+            <th style="padding:8px;text-align:center;width:60px;">操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector("tbody");
+      list.forEach(m => {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom:1px solid var(--border-soft);";
+        const kindLabels = { fact: "事实", preference: "偏好", note: "笔记" };
+        tr.innerHTML = `
+          <td style="padding:8px;color:var(--text-2);font-weight:600;">${esc(kindLabels[m.kind] || m.kind)}</td>
+          <td style="padding:8px;word-break:break-all;">${esc(m.content)}</td>
+          <td style="padding:8px;text-align:center;">
+            <button class="conv-del" onclick="deleteMemory('${m.id}')" style="opacity:1;display:inline-flex;" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      memsContainer.appendChild(table);
+    }
+
+    addMemBtn.onclick = async () => {
+      const content = memContentInput.value.trim();
+      if (!content) return alert("请输入记忆内容");
+      await apiPost("/api/memories", { content, kind: memKindSelect.value });
+      memContentInput.value = "";
+      await renderMemories();
+    };
+
+    window.deleteMemory = async (id) => {
+      if (!confirm("确认删除此条记忆吗？")) return;
+      await apiDelete(`/api/memories/${id}`);
+      await renderMemories();
+    };
+
+    // ===== Document Preview Modal Logic =====
+    const prevModal = $("preview-modal-overlay"), closePrevBtn = $("btn-close-prev");
+    const prevTitle = $("prev-title"), prevPath = $("prev-path"), prevOpenBtn = $("btn-prev-open");
+    const prevViewer = $("prev-viewer"), prevVersions = $("prev-versions");
+
+    async function showPreview(artifactId, fileName, filePath) {
+      prevModal.classList.add("show");
+      prevTitle.textContent = fileName;
+      prevPath.textContent = filePath;
+      prevOpenBtn.onclick = () => {
+        apiGet("/api/open?path=" + encodeURIComponent(filePath)).catch(() => {});
+      };
+
+      // 显示 Spinner 加载动画
+      prevViewer.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);gap:8px;"><span class="tool-spinner"></span> 正在渲染预览文档...</div>`;
+      
+      // 读取并转换内容
+      await loadPreviewContent(filePath);
+
+      // 查询并渲染版本历史
+      await loadVersionsList(artifactId, filePath);
+    }
+
+    async function loadPreviewContent(filePath) {
+      try {
+        const res = await apiGet("/api/preview?path=" + encodeURIComponent(filePath));
+        if (res.error) {
+          prevViewer.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red);">${esc(res.error)}</div>`;
+          return;
+        }
+
+        if (res.kind === "docx") {
+          prevViewer.innerHTML = `<div style="background:#fff;color:#000;padding:24px;border-radius:8px;box-shadow:var(--shadow-sm);min-height:100%;">${res.html}</div>`;
+        } else if (res.kind === "xlsx" || res.kind === "csv") {
+          prevViewer.innerHTML = "";
+          res.sheets.forEach(s => {
+            const wrap = document.createElement("div");
+            wrap.style.marginBottom = "24px";
+            wrap.innerHTML = `<h4 style="font-weight:600;margin-bottom:8px;font-size:13px;color:var(--text-2);">工作表: ${esc(s.name)}</h4>`;
+            
+            const tbl = document.createElement("table");
+            const hasRows = s.rows && s.rows.length > 0;
+            if (!hasRows) {
+              tbl.innerHTML = `<tr><td style="color:var(--text-3);text-align:center;padding:12px;">工作表为空</td></tr>`;
+            } else {
+              tbl.innerHTML = s.rows.map((row, rIdx) => {
+                const tag = rIdx === 0 ? "th" : "td";
+                return `<tr style="${rIdx === 0 ? "background:var(--bg-subtle);" : ""}">${row.map(cell => `<${tag}>${esc(cell)}</${tag}>`).join("")}</tr>`;
+              }).join("");
+            }
+            wrap.appendChild(tbl);
+            prevViewer.appendChild(wrap);
+          });
+        } else if (res.kind === "pptx") {
+          // PPTX 大纲排版
+          prevViewer.innerHTML = `
+            <div style="max-width:600px;margin:0 auto;padding-bottom:20px;">
+              <h4 style="font-weight:600;margin-bottom:12px;font-size:14px;color:var(--text-2);">演示文稿大纲</h4>
+              ${res.text.split("\n\n").map(slide => {
+                const lines = slide.split("\n");
+                const head = lines[0];
+                const rest = lines.slice(1).join("<br>");
+                return `
+                  <div style="background:var(--bg-subtle);border:1px solid var(--border-soft);padding:14px;border-radius:10px;margin-bottom:12px;">
+                    <div style="font-weight:650;margin-bottom:6px;font-size:13px;">${esc(head)}</div>
+                    <div style="font-size:12px;color:var(--text-2);line-height:1.5;font-weight:450;">${esc(rest)}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        } else {
+          // MD / TXT
+          prevViewer.innerHTML = `<pre>${esc(res.text)}</pre>`;
+        }
+      } catch (e) {
+        prevViewer.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red);">预览渲染失败: ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadVersionsList(artifactId, activePath) {
+      try {
+        const list = await apiGet(`/api/artifacts/${artifactId}/versions`);
+        prevVersions.innerHTML = `<h4 style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text-2);">版本历史</h4>`;
+        
+        // 当前最新版本项
+        const curItem = document.createElement("div");
+        curItem.className = "version-item active";
+        curItem.innerHTML = `
+          <span class="v-num">当前最新状态</span>
+          <span class="v-time">原地编辑时自动备份</span>
+        `;
+        curItem.onclick = () => {
+          prevVersions.querySelectorAll(".version-item").forEach(i => i.classList.remove("active"));
+          curItem.classList.add("active");
+          loadPreviewContent(activePath);
+        };
+        prevVersions.appendChild(curItem);
+
+        if (list.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText = "font-size:11px;color:var(--text-3);padding:10px;text-align:center;line-height:1.4;";
+          empty.innerHTML = "无历史修改版本。";
+          prevVersions.appendChild(empty);
+          return;
+        }
+
+        list.forEach(v => {
+          const item = document.createElement("div");
+          item.className = "version-item";
+          item.innerHTML = `
+            <span class="v-num">备份版本 v${v.version}</span>
+            <span class="v-time">${timeAgo(v.createdAt)}</span>
+            <button class="v-restore" data-ver="${v.version}">还原此版本</button>
+          `;
+          
+          item.onclick = (e) => {
+            if (e.target.classList.contains("v-restore")) return;
+            prevVersions.querySelectorAll(".version-item").forEach(i => i.classList.remove("active"));
+            item.classList.add("active");
+            loadPreviewContent(v.filePath);
+          };
+
+          // 点击还原
+          item.querySelector(".v-restore").onclick = async (e) => {
+            e.stopPropagation();
+            if (!confirm(`安全警告：确认覆盖当前文件并还原到备份版本 v${v.version} 吗？`)) return;
+            try {
+              await apiPost(`/api/artifacts/${artifactId}/restore`, { version: v.version });
+              alert("工件还原成功 ✅");
+              await loadPreviewContent(activePath);
+              await loadVersionsList(artifactId, activePath);
+              if ($("artifact-panel").classList.contains("show")) loadArtifacts();
+            } catch (err) {
+              alert("还原失败: " + err.message);
+            }
+          };
+
+          prevVersions.appendChild(item);
+        });
+      } catch (e) { console.error("版本历史加载失败:", e); }
+    }
+
+    closePrevBtn.onclick = () => prevModal.classList.remove("show");
+
+    // ===== Built-in Skill Template Popover Logic =====
+    const skillBtn = $("btn-skill"), skillMenu = $("skill-menu");
+    skillBtn.onclick = (e) => {
+      e.stopPropagation();
+      const isShown = skillMenu.classList.contains("show");
+      document.querySelectorAll(".menu-pop.show").forEach(m => m.classList.remove("show"));
+      skillMenu.classList.toggle("show", !isShown);
+      if (!isShown) {
+        const r = skillBtn.getBoundingClientRect();
+        const mw = skillMenu.offsetWidth, mh = skillMenu.offsetHeight;
+        let left = r.left;
+        if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+        if (left < 8) left = 8;
+        let top = r.top - mh - 6;
+        if (top < 8) top = r.bottom + 6;
+        skillMenu.style.left = left + "px";
+        skillMenu.style.top = top + "px";
+      }
+    };
+
+    skillMenu.onclick = (e) => {
+      const it = e.target.closest(".skill-item");
+      if (it) {
+        inputEl.value = it.dataset.q;
+        inputEl.dispatchEvent(new Event("input"));
+        inputEl.focus();
+        skillMenu.classList.remove("show");
+      }
+    };
+    document.addEventListener("click", () => { skillMenu.classList.remove("show"); });
+
     // ===== 绑定事件 =====
     
     // 按钮点击（全局监听 + onclick 双保险）
@@ -1142,7 +1775,44 @@
     $("btn-new").onclick = newConv;
     // 主题切换按钮
     $("theme-toggle").onclick = toggleTheme;
-    applyTheme(document.documentElement.dataset.theme); // 同步图标
+    applyTheme(document.documentElement.dataset.theme);
+
+    // ===== 工件面板 =====
+    const artPanel = $("artifact-panel"), apList = $("ap-list");
+    function toggleArtifacts() {
+      const show = !artPanel.classList.contains("show");
+      artPanel.classList.toggle("show", show);
+      if (show) loadArtifacts();
+    }
+    async function loadArtifacts() {
+      try {
+        const list = await apiGet("/api/artifacts");
+        if (!list || list.length === 0) {
+          apList.innerHTML = '<div class="ap-empty">还没有工件<br>让 Pi-a 生成文档后会出现在这里</div>';
+          return;
+        }
+        apList.innerHTML = "";
+        for (const a of list) {
+          const item = document.createElement("div");
+          item.className = "ap-item";
+          const iconCls = ["docx","xlsx","pptx"].includes(a.kind) ? a.kind : "other";
+          const iconLabel = { docx: "W", xlsx: "X", pptx: "P" }[a.kind] || "📄";
+          const sizeStr = a.bytes > 0 ? (a.bytes > 1024 ? (a.bytes/1024).toFixed(1)+"KB" : a.bytes+"B") : "";
+          item.innerHTML =
+            `<div class="ap-icon ${iconCls}">${iconLabel}</div>
+             <div class="ap-info">
+               <div class="ap-name">${esc(a.fileName)}</div>
+               <div class="ap-meta">${timeAgo(a.createdAt)}${sizeStr ? " · " + sizeStr : ""}</div>
+             </div>`;
+          item.onclick = () => {
+            showPreview(a.id, a.fileName, a.filePath);
+          };
+          apList.appendChild(item);
+        }
+      } catch (e) { console.error("工件加载失败:", e); }
+    }
+    $("btn-artifacts").onclick = toggleArtifacts;
+    $("ap-close").onclick = toggleArtifacts;
     inputEl.addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();

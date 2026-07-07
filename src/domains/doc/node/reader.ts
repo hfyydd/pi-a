@@ -1,12 +1,14 @@
 // src/domains/doc/node/reader.ts
 // 文档读取引擎。对照 04 文档 §四：read_doc 工具的实现层。
-// 支持: txt/md/json/csv(纯文本) + docx(mammoth) + xlsx(exceljs)
+// 支持: txt/md/json/csv(纯文本) + docx(mammoth) + xlsx(exceljs) + pptx(pizzip)
 // pdf 暂不支持（pdf-parse 在 Deno 兼容性未验，P1）
+
+import Pizzip from "pizzip";
 
 const MAX_CHARS = 50_000;
 
 export interface ReadResult {
-  kind: string; // text|markdown|json|csv|docx|xlsx|error
+  kind: string; // text|markdown|json|csv|docx|xlsx|pptx|error
   text: string;
   truncated: boolean;
   tables?: string[][]; // 表格类文档的结构化数据（xlsx/csv）
@@ -31,6 +33,8 @@ export async function readDoc(path: string): Promise<ReadResult> {
         return await readDocx(path);
       case "xlsx":
         return await readXlsx(path);
+      case "pptx":
+        return await readPptx(path);
       default:
         // 未知扩展名尝试当文本读
         return await readText(path, "text");
@@ -91,16 +95,17 @@ function parseCsv(text: string): string[][] {
 
 /** docx：mammoth 转 HTML，再剥成纯文本 */
 async function readDocx(path: string): Promise<ReadResult> {
-  const mammoth = await import("mammoth");
-  const buf = await Deno.readFile(path);
-  // @ts-ignore mammouth 默认导出
-  const result = await mammoth.extractRawText({ arrayBuffer: buf });
+  const mammothMod = await import("mammoth");
+  const mammoth = (mammothMod as any).default || mammothMod;
+  // @ts-ignore
+  const result = await mammoth.extractRawText({ path });
   return truncate(result.value || "(空文档)", "docx");
 }
 
 /** xlsx：exceljs 读所有 sheet，转成 markdown 表格文本 */
 async function readXlsx(path: string): Promise<ReadResult> {
-  const ExcelJS = await import("exceljs");
+  const excelMod = await import("exceljs");
+  const ExcelJS = (excelMod as any).default || excelMod;
   const buf = await Deno.readFile(path);
   // @ts-ignore exceljs 在 Deno 的类型不完全匹配
   const workbook = new ExcelJS.Workbook();
@@ -124,4 +129,39 @@ async function readXlsx(path: string): Promise<ReadResult> {
   });
 
   return truncate(parts.join("\n"), "xlsx");
+}
+
+/** pptx：用 Pizzip 解压并扫描 ppt/slides/slide*.xml，提取 <a:t> 标签生成幻灯片文字大纲 */
+async function readPptx(path: string): Promise<ReadResult> {
+  const buf = await Deno.readFile(path);
+  // @ts-ignore
+  const zip = new Pizzip(buf);
+  const slideFiles: string[] = [];
+
+  for (const filename of Object.keys(zip.files)) {
+    if (filename.startsWith("ppt/slides/slide") && filename.endsWith(".xml")) {
+      slideFiles.push(filename);
+    }
+  }
+
+  slideFiles.sort((a, b) => {
+    const numA = parseInt(a.replace(/[^0-9]/g, ""));
+    const numB = parseInt(b.replace(/[^0-9]/g, ""));
+    return numA - numB;
+  });
+
+  const outline: string[] = [];
+  for (let i = 0; i < slideFiles.length; i++) {
+    const slideFile = slideFiles[i];
+    const xmlText = zip.files[slideFile].asText();
+    // 简易正则匹配 <a:t> 文本内容
+    const matches = xmlText.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [];
+    const slideText = matches.map((m) => m.replace(/<\/?a:t>/g, "")).join(" ");
+    if (slideText.trim()) {
+      outline.push(`## Slide ${i + 1}\n${slideText.trim()}`);
+    }
+  }
+
+  const resultText = outline.length > 0 ? outline.join("\n\n") : "(空幻灯片文档)";
+  return truncate(resultText, "pptx");
 }

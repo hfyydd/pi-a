@@ -16,6 +16,9 @@ const WRITE_TOOLS = new Set([
   "edit",
   "bash",
   "memory_write",
+  "write_docx",
+  "write_xlsx",
+  "write_pptx",
 ]);
 
 export interface PermissionDecision {

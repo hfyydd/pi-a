@@ -75,10 +75,40 @@ export function initDb(): DatabaseSync {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS artifacts (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'docx',
+      bytes INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_artifacts_conv ON artifacts(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_artifacts_created ON artifacts(created_at);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS artifact_versions (
+      artifact_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      file_path TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (artifact_id, version),
+      FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_versions_art ON artifact_versions(artifact_id);
   `);
 
   // 兼容旧库：补 category 列（已存在则跳过）
   addColumn("conversations", "category", "TEXT NOT NULL DEFAULT 'assistant'");
+  // 补 status 列（会话状态：idle/running/done/failed/pending/planning）
+  addColumn("conversations", "status", "TEXT NOT NULL DEFAULT 'idle'");
 
   console.log(`[db] 已初始化: ${DB_PATH}`);
   return db;
