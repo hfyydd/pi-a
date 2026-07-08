@@ -9,7 +9,9 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
 import { getModels, listAllProviders } from "../models.ts";
 import { getApiKey } from "../../infra/keychain.ts";
-import { getReadOnlyTools } from "./index.ts";
+import { createReadOnlyTools } from "@earendil-works/pi-coding-agent";
+
+const HOME = Deno.env.get("HOME") || "/tmp";
 
 const taskSchema = Type.Object({
   description: Type.String({ description: "子任务描述（一句话，如「搜索代码库中所有 TODO」）" }),
@@ -40,7 +42,7 @@ export const taskTool: AgentTool<typeof taskSchema, { tokens: number }> = {
         };
       }
 
-      const roTools = getReadOnlyTools();
+      const roTools = createReadOnlyTools(HOME);
 
       // 收集子 Agent 的输出
       let output = "";
