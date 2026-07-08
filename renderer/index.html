@@ -1462,7 +1462,9 @@
           item.dataset.id = c.id;
           item.style.setProperty("--cat-color", CAT_COLORS[c.category] || CAT_COLORS.assistant);
           const statusColors = { idle: "var(--text-4)", running: "#3b82f6", done: "var(--green)", failed: "var(--red)", pending: "var(--text-3)", planning: "var(--amber)" };
-          const statusDot = c.status && c.status !== "idle" ? `<span class="conv-status-dot" style="background:${statusColors[c.status] || "var(--text-4)"}" title="${c.status}"></span>` : "";
+          const statusDot = c.status === "running" ? `<span style="font-size:10px;color:#3b82f6;background:rgba(59,130,246,.15);padding:1px 5px;border-radius:4px;margin-right:4px;" title="会话未完成（可能因应用异常退出），点击可恢复继续">未完成</span>`
+            : c.status === "failed" ? `<span style="font-size:10px;color:var(--red);background:rgba(239,68,68,.15);padding:1px 5px;border-radius:4px;margin-right:4px;" title="上次运行失败">失败</span>`
+            : c.status && c.status !== "idle" && c.status !== "done" ? `<span class="conv-status-dot" style="background:${statusColors[c.status] || "var(--text-4)"}" title="${c.status}"></span>` : "";
           item.innerHTML =
             `<div class="conv-main">
                <div class="conv-ttl">${statusDot}${esc(c.title || "新对话")}</div>
