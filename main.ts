@@ -888,6 +888,36 @@ if (import.meta.main) {
     });
   } catch {}
 
+  // ===== 托盘常驻 =====
+  // 关闭窗口时隐藏到托盘而非退出；点托盘图标恢复
+  let tray: any = null;
+  try {
+    tray = new _Deno.Tray({ tooltip: "Pi-a · 本地优先 AI 助手" });
+    tray.addEventListener("click", () => {
+      try {
+        if (win.isVisible()) { win.hide(); } else { win.show(); win.focus(); }
+      } catch {}
+    });
+    // 托盘菜单
+    tray.setMenu([
+      { label: "显示 Pi-a", click: () => { try { win.show(); win.focus(); } catch {} } },
+      { label: "新建对话", click: () => { try { win.show(); win.focus(); } catch {} } },
+      { type: "separator" },
+      { label: "退出 Pi-a", click: () => { try { Deno.exit(0); } catch {} } },
+    ]);
+    console.log("[main] 托盘已创建");
+  } catch (e) {
+    console.warn("[main] 托盘不可用:", e);
+  }
+
+  // 窗口关闭按钮 → 最小化到托盘（不退出）
+  try {
+    win.addEventListener("closeRequested", (e: any) => {
+      e.preventDefault?.();
+      win.hide();
+    });
+  } catch {}
+
   console.log("[main] win.windowId =", win.windowId, "serveUrl =", serveUrl);
   console.log("[main] Pi-a 已就绪，使用 HTTP API（/api/*）通信");
 }
