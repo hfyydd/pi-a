@@ -573,6 +573,47 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       await restoreArtifactVersion(id, b.version);
       return json({ ok: true });
     }
+    // POST /api/export-pdf { path } — 导出文档为 PDF（用 soffice/LibreOffice，对照 08 计划功能12）
+    if (path === "/api/export-pdf" && req.method === "POST") {
+      const b = await req.json();
+      const srcPath = b.path?.startsWith("~/") ? (Deno.env.get("HOME") || "") + b.path.slice(1) : b.path;
+      if (!srcPath) return json({ error: "缺少 path" });
+      try { await Deno.stat(srcPath); } catch { return json({ error: "文件不存在" }); }
+      // 检测 soffice
+      const soffice = await (async () => {
+        const candidates = ["/Applications/LibreOffice.app/Contents/MacOS/soffice", "/opt/homebrew/bin/soffice"];
+        for (const c of candidates) {
+          try { await Deno.stat(c); return c; } catch {}
+        }
+        return null;
+      })();
+      if (!soffice) {
+        return json({ error: "未检测到 LibreOffice/soffice，请安装：brew install --cask libreoffice" });
+      }
+      const outDir = srcPath.split("/").slice(0, -1).join("/") || ".";
+      try {
+        const cmd = new Deno.Command(soffice, {
+          args: ["--headless", "--convert-to", "pdf", "--outdir", outDir, srcPath],
+          stdout: "piped", stderr: "piped",
+        });
+        const r = await cmd.output();
+        if (r.code !== 0) {
+          const stderr = new TextDecoder().decode(r.stderr);
+          return json({ error: `转换失败：${stderr}` });
+        }
+        const pdfPath = srcPath.replace(/\.(docx|xlsx|pptx|doc|xls|ppt)$/i, ".pdf");
+        // 登记为工件
+        try {
+          const { createArtifact } = await import("./src/domains/artifact/node/store.ts");
+          const fileName = pdfPath.split("/").pop() || "export.pdf";
+          const stat = await Deno.stat(pdfPath).catch(() => ({ size: 0 }));
+          createArtifact({ fileName, filePath: pdfPath, bytes: stat.size });
+        } catch {}
+        return json({ ok: true, pdfPath });
+      } catch (e) {
+        return json({ error: `导出失败：${(e as Error).message}` });
+      }
+    }
     // GET /api/preview?path=xxx — 格式化文档预览
     if (path === "/api/preview" && req.method === "GET") {
       const filePath = new URL(req.url).searchParams.get("path") || "";

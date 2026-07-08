@@ -1043,6 +1043,7 @@
           <span style="font-size:11px;color:var(--text-3);margin-left:8px;display:inline-block;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" id="prev-path"></span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <button class="cd-btn cd-allow" id="btn-prev-pdf" style="padding:4px 10px;font-size:12px;border-radius:5px;">导出 PDF</button>
           <button class="cd-btn" id="btn-prev-open" style="padding:4px 10px;font-size:12px;border-radius:5px;">在外部打开</button>
           <button class="large-modal-close" id="btn-close-prev" title="关闭">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -2005,7 +2006,7 @@
 
     // ===== Document Preview Modal Logic =====
     const prevModal = $("preview-modal-overlay"), closePrevBtn = $("btn-close-prev");
-    const prevTitle = $("prev-title"), prevPath = $("prev-path"), prevOpenBtn = $("btn-prev-open");
+    const prevTitle = $("prev-title"), prevPath = $("prev-path"), prevOpenBtn = $("btn-prev-open"), prevPdfBtn = $("btn-prev-pdf");
     const prevViewer = $("prev-viewer"), prevVersions = $("prev-versions");
 
     async function showPreview(artifactId, fileName, filePath) {
@@ -2014,6 +2015,22 @@
       prevPath.textContent = filePath;
       prevOpenBtn.onclick = () => {
         apiGet("/api/open?path=" + encodeURIComponent(filePath)).catch(() => {});
+      };
+      // 导出 PDF（功能12，用 soffice/LibreOffice 转换）
+      const isPdfExportable = /\.(docx|xlsx|pptx|doc|xls|ppt)$/i.test(filePath);
+      prevPdfBtn.style.display = isPdfExportable ? "" : "none";
+      prevPdfBtn.onclick = async () => {
+        prevPdfBtn.disabled = true; prevPdfBtn.textContent = "导出中...";
+        try {
+          const res = await apiPost("/api/export-pdf", { path: filePath });
+          if (res.error) { alert("导出失败：" + res.error); return; }
+          alert("✓ 已导出 PDF：" + res.pdfPath);
+          loadArtifacts();
+        } catch (e) {
+          alert("导出失败：" + (e.message || e));
+        } finally {
+          prevPdfBtn.disabled = false; prevPdfBtn.textContent = "导出 PDF";
+        }
       };
 
       // 显示 Spinner 加载动画
