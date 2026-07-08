@@ -18,7 +18,7 @@ for (const envPath of [".env", `${Deno.env.get("HOME")}/.pi-a/.env`, `${Deno.env
 }
 console.log("[main] DEEPSEEK_API_KEY:", Deno.env.get("DEEPSEEK_API_KEY") ? "已设置(" + Deno.env.get("DEEPSEEK_API_KEY")!.slice(0,8) + "...)" : "未设置");
 
-import { RENDERER_HTML } from "./src/ui/renderer.ts";
+// RENDERER_HTML 已废弃，前端改为 frontend/dist/ 静态文件 serve
 import { initDb } from "./src/infra/db.ts";
 import { getDb } from "./src/infra/db.ts";
 import { initModels, listModels, listAllProviders, registerProvider, listAvailableProviders } from "./src/agent/models.ts";
@@ -843,16 +843,41 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
 }
 
 if (import.meta.main) {
+  const FRONTEND_DIR = new URL("./frontend/dist/", import.meta.url);
+  const MIME: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+  };
+
   const httpServer = Deno.serve({ port: 0 }, async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
-    if (path === "/" || path === "/index.html") {
-      return new Response(RENDERER_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-    }
     if (path.startsWith("/api/")) {
       return handleApi(req, path);
     }
-    return new Response("404", { status: 404 });
+    // serve frontend/dist/
+    let filePath = path === "/" ? "/index.html" : path;
+    const fullPath = new URL("." + filePath, FRONTEND_DIR);
+    try {
+      const data = await Deno.readFile(fullPath);
+      const ext = path.split(".").pop()?.toLowerCase() || "";
+      return new Response(data, {
+        headers: { "content-type": MIME[`.` + ext] || "application/octet-stream" },
+      });
+    } catch {
+      // SPA fallback：非文件请求返回 index.html
+      try {
+        const indexData = await Deno.readFile(new URL("./index.html", FRONTEND_DIR));
+        return new Response(indexData, { headers: { "content-type": "text/html; charset=utf-8" } });
+      } catch {
+        return new Response("Frontend not built. Run: cd frontend && npm run build", { status: 500 });
+      }
+    }
   });
   const servePort = (httpServer.addr as any).port;
   const serveUrl = `http://127.0.0.1:${servePort}/`;
