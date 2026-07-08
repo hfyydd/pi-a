@@ -119,7 +119,7 @@ export const writePptxTool: AgentTool<typeof writePptxSchema, { path: string }> 
   },
 };
 
-import { editXlsx, editDocxTemplate, createBackupVersion } from "../../domains/doc/node/editor.ts";
+import { editXlsx, editDocxTemplate, editDocxFree, editPptx, createBackupVersion } from "../../domains/doc/node/editor.ts";
 import { getDb } from "../../infra/db.ts";
 import { getArtifactByPath } from "../../domains/artifact/node/store.ts";
 
@@ -224,6 +224,68 @@ export const editDocxTool: AgentTool<typeof editDocxSchema, { path: string; vers
     return {
       content: [{ type: "text", text: `已成功生成/编辑 Word 文档：${targetPath} ${version !== -1 ? `(已自动备份原版本为 v${version})` : ""}` }],
       details: { path: targetPath, version },
+    };
+  },
+};
+
+// ===== edit_docx_free：自由编辑 Word（增删段落/替换文本，对照 08 计划功能11） =====
+const editDocxFreeSchema = Type.Object({
+  path: Type.String({ description: "Word 文档路径（支持 ~ 路径）" }),
+  ops: Type.Array(Type.Union([
+    Type.Object({ op: Type.Literal("replace_text"), from: Type.String({ description: "原文本" }), to: Type.String({ description: "新文本" }) }),
+    Type.Object({ op: Type.Literal("insert_paragraph"), afterMatch: Type.String({ description: "在此文本所在段落后插入" }), text: Type.String({ description: "新段落文本" }), heading: Type.Optional(Type.Union([Type.Literal("h1"), Type.Literal("h2"), Type.Literal("normal")], { description: "标题级别" })) }),
+    Type.Object({ op: Type.Literal("delete_paragraph"), match: Type.String({ description: "删除含此文本的段落" }) }),
+  ]), { description: "操作数组：replace_text 替换 / insert_paragraph 插入段落 / delete_paragraph 删除段落" }),
+});
+
+export const editDocxFreeTool: AgentTool<typeof editDocxFreeSchema, { path: string; version: number }> = {
+  name: "edit_docx_free",
+  label: "自由编辑 Word",
+  description: "自由编辑 Word 文档：替换文本、在某段后插入段落、删除含某文本的段落。保留原有样式。修改前自动备份版本。适合非模板的已有文档编辑。",
+  parameters: editDocxFreeSchema,
+  execute: async (_id, p) => {
+    const fullPath = resolvePath(p.path);
+    const db = getDb();
+    const activeConv = db.prepare("SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1").get() as { id: string } | undefined;
+    const sessionId = activeConv?.id;
+    const version = await createBackupVersion(fullPath, sessionId);
+    await editDocxFree(fullPath, p.ops as any);
+    const stat = await Deno.stat(fullPath).catch(() => ({ size: 0 }));
+    const art = getArtifactByPath(fullPath);
+    if (art) db.prepare("UPDATE artifacts SET bytes = ? WHERE id = ?").run(stat.size, art.id);
+    return {
+      content: [{ type: "text", text: `✓ 已编辑 Word 文档：${fullPath} ${version !== -1 ? `(原版本已备份为 v${version})` : ""}` }],
+      details: { path: fullPath, version },
+    };
+  },
+};
+
+// ===== edit_pptx：编辑 PPT（替换文本，对照 08 计划功能11） =====
+const editPptxSchema = Type.Object({
+  path: Type.String({ description: "PPT 文件路径（支持 ~ 路径）" }),
+  ops: Type.Array(Type.Object({
+    op: Type.Literal("replace_text"),
+    slide: Type.Number({ description: "页码（从 1 开始）" }),
+    from: Type.String({ description: "要替换的原文本" }),
+    to: Type.String({ description: "替换为的新文本" }),
+  }), { description: "替换操作数组：指定页码替换文本" }),
+});
+
+export const editPptxTool: AgentTool<typeof editPptxSchema, { path: string; version: number }> = {
+  name: "edit_pptx",
+  label: "编辑 PPT",
+  description: "编辑 PPT 演示文稿：替换指定页的文本。修改前自动备份版本。",
+  parameters: editPptxSchema,
+  execute: async (_id, p) => {
+    const fullPath = resolvePath(p.path);
+    const db = getDb();
+    const activeConv = db.prepare("SELECT id FROM conversations ORDER BY updated_at DESC LIMIT 1").get() as { id: string } | undefined;
+    const sessionId = activeConv?.id;
+    const version = await createBackupVersion(fullPath, sessionId);
+    await editPptx(fullPath, p.ops as any);
+    return {
+      content: [{ type: "text", text: `✓ 已编辑 PPT：${fullPath} ${version !== -1 ? `(原版本已备份为 v${version})` : ""}` }],
+      details: { path: fullPath, version },
     };
   },
 };

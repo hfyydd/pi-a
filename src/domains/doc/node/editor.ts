@@ -129,3 +129,74 @@ export async function editDocxTemplate(
   await Deno.writeFile(targetPath, buf);
   return targetPath;
 }
+
+/** XML 转义 */
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** docx 自由编辑操作（结构化 op 驱动，对照 08 计划功能11） */
+export type DocxOp =
+  | { op: "replace_text"; from: string; to: string }
+  | { op: "insert_paragraph"; afterMatch: string; text: string; heading?: "h1" | "h2" | "normal" }
+  | { op: "delete_paragraph"; match: string };
+
+/**
+ * 自由编辑 Word 文档（pizzip 直接操作 word/document.xml，保真度高）。
+ * 支持：替换文本、在某段后插入段落、删除含某文本的段落。复杂样式保留。
+ */
+export async function editDocxFree(filePath: string, ops: DocxOp[]): Promise<string> {
+  const buf = await Deno.readFile(filePath);
+  // @ts-ignore
+  const zip = new Pizzip(buf);
+  const docFile = zip.file("word/document.xml");
+  if (!docFile) throw new Error("文档格式异常：找不到 word/document.xml");
+  let xml = docFile.asText();
+  for (const o of ops) {
+    if (o.op === "replace_text") {
+      xml = xml.split(escapeXml(o.from)).join(escapeXml(o.to));
+    } else if (o.op === "delete_paragraph") {
+      const m = escapeXml(o.match).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`<w:p[^>]*>[\\s\\S]*?${m}[\\s\\S]*?</w:p>`, "g");
+      xml = xml.replace(re, "");
+    } else if (o.op === "insert_paragraph") {
+      const m = escapeXml(o.afterMatch).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const style = o.heading === "h1" ? '<w:pStyle w:val="Heading1"/>'
+        : o.heading === "h2" ? '<w:pStyle w:val="Heading2"/>' : "";
+      const newP = `<w:p>${style ? `<w:pPr>${style}</w:pPr>` : ""}<w:r><w:t xml:space="preserve">${escapeXml(o.text)}</w:t></w:r></w:p>`;
+      const re = new RegExp(`(<w:p[^>]*>[\\s\\S]*?${m}[\\s\\S]*?</w:p>)`, "g");
+      xml = xml.replace(re, `$1${newP}`);
+    }
+  }
+  zip.file("word/document.xml", xml);
+  const out = zip.generate({ type: "nodebuffer" });
+  await Deno.writeFile(filePath, out);
+  return filePath;
+}
+
+/** pptx 编辑操作 */
+export type PptxOp =
+  | { op: "replace_text"; slide: number; from: string; to: string };
+
+/**
+ * 编辑 PPT 演示文稿（pizzip 操作 ppt/slides/slideN.xml）。
+ * 支持：替换某页文本。（duplicate_slide 涉及 rels/Content_Types 较复杂，留 P2）
+ */
+export async function editPptx(filePath: string, ops: PptxOp[]): Promise<string> {
+  const buf = await Deno.readFile(filePath);
+  // @ts-ignore
+  const zip = new Pizzip(buf);
+  for (const o of ops) {
+    if (o.op === "replace_text") {
+      const file = `ppt/slides/slide${o.slide}.xml`;
+      const f = zip.file(file);
+      if (!f) throw new Error(`幻灯片第 ${o.slide} 页不存在`);
+      let sxml = f.asText();
+      sxml = sxml.split(escapeXml(o.from)).join(escapeXml(o.to));
+      zip.file(file, sxml);
+    }
+  }
+  const out = zip.generate({ type: "nodebuffer" });
+  await Deno.writeFile(filePath, out);
+  return filePath;
+}

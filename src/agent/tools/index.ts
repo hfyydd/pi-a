@@ -5,7 +5,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { createCodingTools, createReadOnlyTools } from "@earendil-works/pi-coding-agent";
 import { memoryRecallTool, memoryWriteTool } from "./memory.ts";
-import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool } from "./doc.ts";
+import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool } from "./doc.ts";
 import { webFetchTool, webSearchTool } from "./web.ts";
 import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool } from "./os.ts";
 
@@ -32,6 +32,8 @@ export function getFullTools(): AgentTool<any>[] {
     writePptxTool,
     editDocxTool,
     editXlsxTool,
+    editDocxFreeTool,
+    editPptxTool,
     webFetchTool,
     webSearchTool,
     // Computer Use 工具（功能13）
@@ -56,4 +58,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool };
