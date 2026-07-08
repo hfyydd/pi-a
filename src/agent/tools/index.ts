@@ -9,6 +9,7 @@ import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool,
 import { webFetchTool, webSearchTool } from "./web.ts";
 import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool } from "./os.ts";
 import { indexDocTool, searchDocsTool } from "./rag.ts";
+import { taskTool } from "./task.ts";
 
 const HOME = Deno.env.get("HOME") || "/tmp";
 
