@@ -24,6 +24,7 @@ import { initModels, listModels, listAllProviders, registerProvider, listAvailab
 import { provider, type AgentEvent } from "./src/agent/provider.ts";
 import { setConfirmHandler, clearConfirmHandler } from "./src/agent/permissions.ts";
 import { ensureSkillsDir } from "./src/agent/skills.ts";
+import { startScheduler } from "./src/domains/automation/node/scheduler.ts";
 import { ensureMcpConfig, connectAllMcpServers } from "./src/agent/mcp.ts";
 import { setMcpTools } from "./src/agent/tools/index.ts";
 import {
@@ -39,6 +40,7 @@ initDb();
 initModels();
 ensureSkillsDir();
 ensureMcpConfig();
+startScheduler();
 
 // 启动时自动注册所有已经配置了 API Key 的 Provider
 (async () => {
@@ -463,6 +465,93 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const { deleteSkill } = await import("./src/domains/skill/node/store.ts");
       try {
         await deleteSkill(name);
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
+    }
+    // ===== 自动化 API（功能8） =====
+    // GET /api/automations — 列出所有自动化
+    if (path === "/api/automations" && req.method === "GET") {
+      const { listAutomations } = await import("./src/domains/automation/node/store.ts");
+      return json(listAutomations());
+    }
+    // POST /api/automations — 新建 { name, triggerType, triggerConfig, actionType, actionConfig }
+    if (path === "/api/automations" && req.method === "POST") {
+      const b = await req.json();
+      const { createAutomation, updateAutomation, getAutomation } = await import("./src/domains/automation/node/store.ts");
+      const { nextCronTime } = await import("./src/domains/automation/node/scheduler.ts");
+      const a = createAutomation(b);
+      if (a.triggerType === "cron" && a.triggerConfig.cron) {
+        const nt = nextCronTime(a.triggerConfig.cron, new Date());
+        if (nt) updateAutomation(a.id, { nextRun: nt.getTime() });
+      }
+      return json(getAutomation(a.id));
+    }
+    // PUT /api/automations/:id — 更新（name/enabled/trigger/action 等）
+    if (path.match(/^\/api\/automations\/[^/]+$/) && !path.endsWith("/runs") && !path.endsWith("/run") && req.method === "PUT") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      const { updateAutomation, getAutomation } = await import("./src/domains/automation/node/store.ts");
+      const { nextCronTime } = await import("./src/domains/automation/node/scheduler.ts");
+      updateAutomation(id, b);
+      // 更新后重算 next_run
+      const a = getAutomation(id);
+      if (a && a.enabled && a.triggerType === "cron" && a.triggerConfig.cron) {
+        const nt = nextCronTime(a.triggerConfig.cron, new Date());
+        updateAutomation(id, { nextRun: nt ? nt.getTime() : null });
+      } else if (a && (!a.enabled || a.triggerType !== "cron")) {
+        updateAutomation(id, { nextRun: null });
+      }
+      return json(getAutomation(id));
+    }
+    // DELETE /api/automations/:id
+    if (path.match(/^\/api\/automations\/[^/]+$/) && !path.endsWith("/runs") && !path.endsWith("/run") && req.method === "DELETE") {
+      const id = path.split("/")[3];
+      const { deleteAutomation } = await import("./src/domains/automation/node/store.ts");
+      deleteAutomation(id);
+      return json({ ok: true });
+    }
+    // GET /api/automations/:id/runs — 运行记录
+    if (path.match(/^\/api\/automations\/[^/]+\/runs$/) && req.method === "GET") {
+      const id = path.split("/")[3];
+      const { listRuns } = await import("./src/domains/automation/node/store.ts");
+      return json(listRuns(id));
+    }
+    // POST /api/automations/:id/run — 手动触发一次
+    if (path.match(/^\/api\/automations\/[^/]+\/run$/) && req.method === "POST") {
+      const id = path.split("/")[3];
+      const { getAutomation, createRun, finishRun } = await import("./src/domains/automation/node/store.ts");
+      const a = getAutomation(id);
+      if (!a) return json({ error: "自动化不存在" });
+      const prompt = a.actionType === "skill"
+        ? `【执行技能】${a.actionConfig.skill || ""}`
+        : (a.actionConfig.prompt || "");
+      const conv = createConversation(`[自动] ${a.name}`, "automation");
+      const run = createRun(a.id, conv.id);
+      (async () => {
+        try {
+          await provider.prompt(conv.id, prompt, { mode: "craft", permission: "default" });
+          finishRun(run.id, "completed", "手动触发已执行");
+        } catch (e) {
+          finishRun(run.id, "failed", (e as Error).message);
+        }
+      })();
+      return json({ ok: true, runId: run.id, sessionId: conv.id });
+    }
+    // ===== 文件快照 API（功能17） =====
+    // GET /api/file-snapshots?path= — 列出文件快照（有 path 列某文件快照，无 path 列所有文件）
+    if (path === "/api/file-snapshots" && req.method === "GET") {
+      const fp = new URL(req.url).searchParams.get("path");
+      const { listFileSnapshots, listSnapshottedFiles } = await import("./src/infra/file_snapshot.ts");
+      return json(fp ? listFileSnapshots(fp) : listSnapshottedFiles());
+    }
+    // POST /api/file-snapshots/:id/revert — 回滚到某快照
+    if (path.match(/^\/api\/file-snapshots\/[^/]+\/revert$/) && req.method === "POST") {
+      const id = path.split("/")[3];
+      const { revertFileSnapshot } = await import("./src/infra/file_snapshot.ts");
+      try {
+        await revertFileSnapshot(id);
         return json({ ok: true });
       } catch (e) {
         return json({ error: (e as Error).message });

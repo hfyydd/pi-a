@@ -880,6 +880,7 @@
           <button class="settings-tab" data-tab="tab-memory">🧠 长期记忆</button>
           <button class="settings-tab" data-tab="tab-mcp">🔌 MCP 插件</button>
           <button class="settings-tab" data-tab="tab-skills">⚡ 技能管理</button>
+          <button class="settings-tab" data-tab="tab-snapshots">📸 文件快照</button>
         </div>
         <!-- 内容区域 -->
         <div class="settings-content active" id="tab-model">
@@ -973,6 +974,12 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="settings-content" id="tab-snapshots" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
+          <h3 style="margin-bottom:8px;font-size:14px;font-weight:600;">文件快照</h3>
+          <p style="font-size:11.5px;color:var(--text-3);margin-bottom:12px;line-height:1.4;">Agent 用 bash 改文件前会自动快照。可查看历史并回滚。</p>
+          <div id="snapshots-files" style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;"></div>
         </div>
 
         <div class="settings-content" id="tab-mcp" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
@@ -1677,6 +1684,8 @@
       const cfg = await apiGet("/api/settings");
       // 加载技能列表（技能 tab 用）
       renderSkills().catch(() => {});
+      // 加载文件快照列表（快照 tab 用）
+      renderSnapshots().catch(() => {});
 
       // 渲染 Provider 选择列表
       providerSelect.innerHTML = "";
@@ -2399,8 +2408,195 @@
       activeCat = item.dataset.cat;
       $("nav-list").querySelectorAll(".nav-item").forEach(t => t.classList.toggle("active", t === item));
       currentId = null; clearChat(); convTitleEl.textContent = CAT_LABELS[activeCat] || "新对话";
-      loadConversations(); showWelcome();
+      loadConversations();
+      if (activeCat === "automation") { renderAutomationView(); return; }
+      showWelcome();
     });
+
+    // ===== 自动化管理视图（功能8） =====
+    async function renderAutomationView() {
+      let list = [];
+      try { list = await apiGet("/api/automations"); } catch {}
+      innerEl.innerHTML = `
+        <div style="max-width:780px;margin:0 auto;padding:20px 16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+              <h2 style="font-size:17px;font-weight:600;">自动化</h2>
+              <p style="font-size:11.5px;color:var(--text-3);margin-top:2px;">定时触发执行任务。触发的会话归入"自动化"分类。</p>
+            </div>
+            <button class="cd-btn cd-allow" id="btn-new-auto" style="padding:7px 14px;border-radius:8px;font-size:13px;">+ 新建</button>
+          </div>
+          <div id="auto-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>`;
+      const autoList = $("auto-list");
+      if (list.length === 0) {
+        autoList.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;border:1px dashed var(--border-soft);border-radius:10px;">暂无自动化。点击"新建"创建定时任务。</div>`;
+      } else {
+        for (const a of list) {
+          const cron = a.triggerType === "cron" ? (a.triggerConfig.cron || "-") : "文件监听";
+          const next = a.nextRun ? new Date(a.nextRun).toLocaleString("zh-CN") : "未调度";
+          const last = a.lastRun ? new Date(a.lastRun).toLocaleString("zh-CN") : "从未";
+          const action = a.actionType === "skill" ? `技能: ${a.actionConfig.skill || ""}` : "自定义提示词";
+          const card = document.createElement("div");
+          card.style.cssText = "background:var(--bg-subtle);border:1px solid var(--border-soft);border-radius:10px;padding:14px;";
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                  <span style="font-weight:600;font-size:14px;">${esc(a.name)}</span>
+                  <span style="font-size:10.5px;padding:2px 6px;border-radius:4px;background:${a.enabled ? "rgba(34,197,94,.15)" : "var(--bg)"};color:${a.enabled ? "#22c55e" : "var(--text-3)"};">${a.enabled ? "已启用" : "已停用"}</span>
+                </div>
+                <div style="font-size:12px;color:var(--text-3);line-height:1.7;">
+                  <div>⏰ 触发: <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px;">${esc(cron)}</code></div>
+                  <div>⚡ 动作: ${esc(action)}</div>
+                  <div>🕐 下次: ${esc(next)} ｜ 上次: ${esc(last)}</div>
+                </div>
+                <div id="runs-${a.id}" style="margin-top:8px;"></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button class="cd-btn" onclick="toggleAuto('${a.id}', ${!a.enabled})" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">${a.enabled ? "停用" : "启用"}</button>
+                <button class="cd-btn" onclick="runAutoNow('${a.id}')" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">立即运行</button>
+                <button class="cd-btn" onclick="loadAutoRuns('${a.id}')" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">运行记录</button>
+                <button class="cd-btn cd-deny" onclick="delAuto('${a.id}','${esc(a.name)}')" style="padding:5px 10px;border-radius:6px;font-size:11px;">删除</button>
+              </div>
+            </div>`;
+          autoList.appendChild(card);
+        }
+      }
+      $("btn-new-auto").onclick = showAutoForm;
+    }
+    async function showAutoForm() {
+      const skills = await apiGet("/api/skills").catch(() => []);
+      const skillOpts = skills.map((s) => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+      const f = document.createElement("div");
+      f.style.cssText = "background:var(--bg-subtle);border:1px solid var(--accent);border-radius:10px;padding:16px;margin-top:12px;";
+      f.innerHTML = `
+        <div style="font-weight:600;font-size:13px;margin-bottom:10px;">新建自动化</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input id="af-name" placeholder="名称（如：每日桌面整理）" style="padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+          <div>
+            <label style="font-size:11px;color:var(--text-3);">Cron 表达式（分 时 日 月 周，如 0 9 * * 1 = 每周一9点）</label>
+            <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
+              <input id="af-cron" value="0 9 * * *" style="flex:1;min-width:140px;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--mono);" />
+              <button class="cd-btn" onclick="document.getElementById('af-cron').value='*/5 * * * *'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每5分</button>
+              <button class="cd-btn" onclick="document.getElementById('af-cron').value='0 9 * * *'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每天9点</button>
+              <button class="cd-btn" onclick="document.getElementById('af-cron').value='0 9 * * 1'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每周一</button>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-3);">动作类型</label>
+            <select id="af-action-type" style="width:100%;padding:8px;margin-top:4px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" onchange="toggleAutoAction()">
+              <option value="prompt">自定义提示词</option>
+              <option value="skill">执行技能</option>
+            </select>
+          </div>
+          <div id="af-prompt-box">
+            <textarea id="af-prompt" placeholder="要让 Agent 执行的提示词..." style="width:100%;min-height:70px;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+          </div>
+          <div id="af-skill-box" style="display:none;">
+            <select id="af-skill" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;">${skillOpts}</select>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="cd-btn" id="af-cancel" style="padding:7px 14px;border-radius:6px;font-size:13px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">取消</button>
+            <button class="cd-btn cd-allow" id="af-save" style="padding:7px 14px;border-radius:6px;font-size:13px;">保存</button>
+          </div>
+        </div>`;
+      $("auto-list").prepend(f);
+      $("af-cancel").onclick = () => f.remove();
+      $("af-save").onclick = async () => {
+        const name = $("af-name").value.trim();
+        const cron = $("af-cron").value.trim();
+        const actionType = $("af-action-type").value;
+        if (!name) return alert("请输入名称");
+        if (!cron) return alert("请输入 cron");
+        const actionConfig = actionType === "skill" ? { skill: $("af-skill").value } : { prompt: $("af-prompt").value.trim() };
+        if (actionType === "prompt" && !actionConfig.prompt) return alert("请输入提示词");
+        const res = await apiPost("/api/automations", { name, triggerType: "cron", triggerConfig: { cron }, actionType, actionConfig });
+        if (res.error) return alert("创建失败：" + res.error);
+        renderAutomationView();
+      };
+    }
+    function toggleAutoAction() {
+      const t = document.getElementById("af-action-type").value;
+      document.getElementById("af-prompt-box").style.display = t === "prompt" ? "" : "none";
+      document.getElementById("af-skill-box").style.display = t === "skill" ? "" : "none";
+    }
+    async function toggleAuto(id, enable) {
+      await apiPut(`/api/automations/${id}`, { enabled: enable });
+      renderAutomationView();
+    }
+    async function runAutoNow(id) {
+      const res = await apiPost(`/api/automations/${id}/run`, {});
+      if (res.error) return alert("运行失败：" + res.error);
+      alert("✓ 已触发，查看「自动化」分类下的会话");
+      loadConversations();
+    }
+    async function delAuto(id, name) {
+      if (!confirm(`确认删除自动化「${name}」？`)) return;
+      await apiDelete(`/api/automations/${id}`);
+      renderAutomationView();
+    }
+    async function loadAutoRuns(id) {
+      const box = document.getElementById(`runs-${id}`);
+      if (box.dataset.loaded === "1") { box.innerHTML = ""; box.dataset.loaded = "0"; return; }
+      const runs = await apiGet(`/api/automations/${id}/runs`);
+      box.dataset.loaded = "1";
+      if (runs.length === 0) { box.innerHTML = `<div style="font-size:11.5px;color:var(--text-3);padding:6px 0;">暂无运行记录</div>`; return; }
+      box.innerHTML = `<div style="font-size:11.5px;color:var(--text-3);padding:6px 0;border-top:1px solid var(--border-soft);">运行记录：</div>` +
+        runs.slice(0, 10).map((r) => `<div style="font-size:11.5px;color:var(--text-2);padding:2px 0;">${new Date(r.startedAt).toLocaleString("zh-CN")} · ${r.status} ${r.summary ? "· " + esc(r.summary) : ""}${r.sessionId ? ` · <a href="#" onclick="switchConv('${r.sessionId}');return false;" style="color:var(--accent);">查看会话</a>` : ""}</div>`).join("");
+    }
+    window.toggleAuto = toggleAuto;
+    window.runAutoNow = runAutoNow;
+    window.delAuto = delAuto;
+    window.loadAutoRuns = loadAutoRuns;
+    window.toggleAutoAction = toggleAutoAction;
+
+    // ===== 文件快照面板（功能17） =====
+    async function renderSnapshots() {
+      const files = await apiGet("/api/file-snapshots");
+      const c = $("snapshots-files");
+      c.innerHTML = "";
+      if (files.length === 0) {
+        c.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-size:12.5px;">暂无快照。Agent 用 bash 改文件时会自动创建。</div>`;
+        return;
+      }
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12.5px;";
+      table.innerHTML = `<thead><tr style="background:var(--bg-subtle);border-bottom:1px solid var(--border-soft);"><th style="padding:8px;text-align:left;">文件路径</th><th style="padding:8px;width:70px;">快照数</th><th style="padding:8px;width:150px;">最近</th><th style="padding:8px;width:80px;">操作</th></tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector("tbody");
+      files.forEach((f) => {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom:1px solid var(--border-soft);";
+        tr.innerHTML = `<td style="padding:8px;word-break:break-all;font-family:var(--mono);font-size:11.5px;">${esc(f.originalPath)}</td><td style="padding:8px;">${f.count}</td><td style="padding:8px;color:var(--text-3);">${new Date(f.latestAt).toLocaleString("zh-CN")}</td><td style="padding:8px;"><button class="cd-btn" onclick="loadSnapshotsFor('${esc(f.originalPath)}')" style="padding:4px 8px;font-size:11px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">查看</button></td>`;
+        tbody.appendChild(tr);
+      });
+      c.appendChild(table);
+    }
+    async function loadSnapshotsFor(path) {
+      const snaps = await apiGet(`/api/file-snapshots?path=${encodeURIComponent(path)}`);
+      const c = $("snapshots-files");
+      c.innerHTML = `<div style="padding:8px 0;display:flex;align-items:center;gap:8px;"><button class="cd-btn" onclick="renderSnapshots()" style="padding:4px 10px;font-size:11px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">← 返回</button><span style="font-family:var(--mono);font-size:11.5px;word-break:break-all;">${esc(path)}</span></div>`;
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12.5px;";
+      table.innerHTML = `<thead><tr style="background:var(--bg-subtle);"><th style="padding:8px;text-align:left;">快照时间</th><th style="padding:8px;width:80px;">操作</th></tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector("tbody");
+      snaps.forEach((s) => {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom:1px solid var(--border-soft);";
+        tr.innerHTML = `<td style="padding:8px;color:var(--text-2);">${new Date(s.createdAt).toLocaleString("zh-CN")}</td><td style="padding:8px;"><button class="cd-btn cd-deny" onclick="revertSnap('${s.id}')" style="padding:4px 8px;font-size:11px;border-radius:5px;">回滚</button></td>`;
+        tbody.appendChild(tr);
+      });
+      c.appendChild(table);
+    }
+    async function revertSnap(id) {
+      if (!confirm("确认回滚？当前文件内容将被快照覆盖。")) return;
+      const res = await apiPost(`/api/file-snapshots/${id}/revert`, {});
+      if (res.error) return alert("回滚失败：" + res.error);
+      alert("✓ 已回滚");
+    }
+    window.renderSnapshots = renderSnapshots;
+    window.loadSnapshotsFor = loadSnapshotsFor;
+    window.revertSnap = revertSnap;
 
     // 侧边栏收起 / 展开
     function toggleSidebar() {

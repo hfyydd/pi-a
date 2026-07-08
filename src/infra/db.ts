@@ -121,6 +121,40 @@ export function initDb(): DatabaseSync {
       created_at INTEGER NOT NULL,
       PRIMARY KEY (src, dst)
     );
+
+    CREATE TABLE IF NOT EXISTS automations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      trigger_type TEXT NOT NULL,
+      trigger_config TEXT NOT NULL,
+      action_type TEXT NOT NULL,
+      action_config TEXT NOT NULL,
+      last_run INTEGER,
+      next_run INTEGER,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_runs (
+      id TEXT PRIMARY KEY,
+      automation_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      session_id TEXT,
+      summary TEXT,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      FOREIGN KEY (automation_id) REFERENCES automations(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_auto_runs_aid ON automation_runs(automation_id);
+
+    CREATE TABLE IF NOT EXISTS file_snapshots (
+      id TEXT PRIMARY KEY,
+      original_path TEXT NOT NULL,
+      snapshot_path TEXT NOT NULL,
+      session_id TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_snap_path ON file_snapshots(original_path);
   `);
 
   // 补 conversations.project_id 列

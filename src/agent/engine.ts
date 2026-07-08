@@ -10,6 +10,7 @@ import { getApiKey } from "../infra/keychain.ts";
 import { checkToolPermission, logToolCall } from "./permissions.ts";
 import { getTools } from "./tools/index.ts";
 import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
+import { snapshotFile, detectFileWrites } from "../infra/file_snapshot.ts";
 import { recallMemories, recallWorkingMemory } from "../domains/memory/node/store.ts";
 
 const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
@@ -167,7 +168,17 @@ export function createWorkBuddyAgent(
       const sessionId = (agent as any).__sessionId as string | undefined;
       const perm = (agent as any).__perm as "readonly" | "default" | "full" | undefined;
       const d = await checkToolPermission(sessionId ?? "", perm ?? "default", ctx.toolCall.name, ctx.args);
-      if (d.allow) return undefined;
+      if (d.allow) {
+        // bash 写文件前自动快照（default 确认通过后 / full 直接放行后，执行前）
+        if (ctx.toolCall.name === "bash") {
+          const cmd = (ctx.args as any)?.command || "";
+          const files = detectFileWrites(cmd);
+          for (const f of files) {
+            try { await snapshotFile(f, sessionId); } catch {}
+          }
+        }
+        return undefined;
+      }
       return { block: true, reason: d.reason };
     },
     // 审计钩子：afterToolCall（落 SQLite）
