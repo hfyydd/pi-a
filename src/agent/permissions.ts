@@ -22,6 +22,16 @@ const WRITE_TOOLS = new Set([
   "write_docx",
   "write_xlsx",
   "write_pptx",
+  // Computer Use 操作工具（default 下需确认）
+  "mouse_click",
+  "mouse_move",
+  "key_type",
+]);
+
+/** 危险工具（即使 full 权限也强制确认）—— Computer Use 的点击/键盘 */
+const DANGER_TOOLS = new Set([
+  "mouse_click",
+  "key_type",
 ]);
 
 /** 危险命令黑名单（正则，所有权限级别都拦截） */
@@ -91,8 +101,23 @@ export async function checkToolPermission(
     }
   }
 
-  // 完全访问权限（L3）：全放行
+  // 完全访问权限（L3）：全放行，但危险工具（Computer Use 点击/键盘）仍强制确认
   if (perm === "full") {
+    if (DANGER_TOOLS.has(toolName)) {
+      const handler = confirmHandlers.get(sessionId);
+      if (!handler) {
+        return { allow: false, block: true, reason: `危险操作 ${toolName} 无确认通道` };
+      }
+      try {
+        const approved = await handler(toolName, args);
+        return approved
+          ? { allow: true }
+          : { allow: false, block: true, reason: "用户拒绝了工具调用" };
+      } catch (e) {
+        console.error(`[permissions] 危险工具确认回调异常:`, e);
+        return { allow: false, block: true, reason: "确认流程出错" };
+      }
+    }
     return { allow: true };
   }
 

@@ -7,6 +7,7 @@ import { createCodingTools, createReadOnlyTools } from "@earendil-works/pi-codin
 import { memoryRecallTool, memoryWriteTool } from "./memory.ts";
 import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool } from "./doc.ts";
 import { webFetchTool, webSearchTool } from "./web.ts";
+import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool } from "./os.ts";
 
 const HOME = Deno.env.get("HOME") || "/tmp";
 
@@ -33,6 +34,13 @@ export function getFullTools(): AgentTool<any>[] {
     editXlsxTool,
     webFetchTool,
     webSearchTool,
+    // Computer Use 工具（功能13）
+    screenshotTool,
+    mouseClickTool,
+    mouseMoveTool,
+    keyTypeTool,
+    appFocusTool,
+    cursorPosTool,
     ...mcpTools,
   ];
 }
@@ -48,4 +56,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, webFetchTool, webSearchTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool };
