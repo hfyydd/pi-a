@@ -156,22 +156,60 @@ export async function editDocxFree(filePath: string, ops: DocxOp[]): Promise<str
     if (o.op === "replace_text") {
       xml = xml.split(escapeXml(o.from)).join(escapeXml(o.to));
     } else if (o.op === "delete_paragraph") {
-      const m = escapeXml(o.match).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`<w:p[^>]*>[\\s\\S]*?${m}[\\s\\S]*?</w:p>`, "g");
-      xml = xml.replace(re, "");
+      // 跨 run 修复：先提取每个 <w:p> 的纯文本，在纯文本上匹配，命中则删原始段落
+      const matchText = o.match.toLowerCase();
+      xml = removeParagraphsByText(xml, (plainText) => plainText.toLowerCase().includes(matchText), 1);
     } else if (o.op === "insert_paragraph") {
-      const m = escapeXml(o.afterMatch).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // 跨 run 修复：在纯文本匹配到的段落后面插入新段落
+      const afterText = o.afterMatch.toLowerCase();
       const style = o.heading === "h1" ? '<w:pStyle w:val="Heading1"/>'
         : o.heading === "h2" ? '<w:pStyle w:val="Heading2"/>' : "";
       const newP = `<w:p>${style ? `<w:pPr>${style}</w:pPr>` : ""}<w:r><w:t xml:space="preserve">${escapeXml(o.text)}</w:t></w:r></w:p>`;
-      const re = new RegExp(`(<w:p[^>]*>[\\s\\S]*?${m}[\\s\\S]*?</w:p>)`, "g");
-      xml = xml.replace(re, `$1${newP}`);
+      xml = insertAfterParagraphByText(xml, afterText, newP, 1);
     }
   }
   zip.file("word/document.xml", xml);
   const out = zip.generate({ type: "nodebuffer" });
   await Deno.writeFile(filePath, out);
   return filePath;
+}
+
+/**
+ * 从 XML 中按纯文本条件查找并删除段落（跨 run 安全）
+ * @param xml 原始 XML
+ * @param predicate 接收段落纯文本，返回 true 则删除
+ * @param maxDelete 最多删几个（默认 1，防误删）
+ */
+function removeParagraphsByText(xml: string, predicate: (plainText: string) => boolean, maxDelete = 1): string {
+  const paraRegex = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+  let deleted = 0;
+  return xml.replace(paraRegex, (para) => {
+    if (deleted >= maxDelete) return para;
+    // 提取纯文本：去掉所有标签 + 解码实体
+    const plain = para.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+    if (predicate(plain)) {
+      deleted++;
+      return ""; // 删除该段落
+    }
+    return para;
+  });
+}
+
+/**
+ * 在纯文本匹配的段落后面插入新内容（跨 run 安全）
+ */
+function insertAfterParagraphByText(xml: string, matchText: string, newXml: string, maxInsert = 1): string {
+  const paraRegex = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+  let inserted = 0;
+  return xml.replace(paraRegex, (para) => {
+    if (inserted >= maxInsert) return para;
+    const plain = para.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+    if (plain.toLowerCase().includes(matchText)) {
+      inserted++;
+      return para + newXml; // 在匹配段落后面插入
+    }
+    return para;
+  });
 }
 
 /** pptx 编辑操作 */

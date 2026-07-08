@@ -117,9 +117,36 @@ export async function searchChunks(
     ? db.prepare("SELECT text, keywords, doc_path as docPath, chunk_index as chunkIndex FROM doc_chunks WHERE doc_path = ?").all(docPath)
     : db.prepare("SELECT text, keywords, doc_path as docPath, chunk_index as chunkIndex FROM doc_chunks").all()
   ) as unknown as { text: string; keywords: string; docPath: string; chunkIndex: number }[];
+
+  // 计算 IDF（文档频率：每个 term 出现在多少 chunk 里）
+  const N = rows.length;
+  const dfMap = new Map<string, number>();
+  for (const r of rows) {
+    const terms = (JSON.parse(r.keywords || "[]") as [string, number][]);
+    for (const [term] of terms) {
+      dfMap.set(term, (dfMap.get(term) ?? 0) + 1);
+    }
+  }
+  // IDF 权重函数
+  const idf = (term: string): number => {
+    const df = dfMap.get(term) ?? 0;
+    return Math.log(N / (1 + df));
+  };
+
+  // 查询向量加 IDF 权重
+  const qWeighted = new Map<string, number>();
+  for (const [term, freq] of qTf) {
+    qWeighted.set(term, freq * idf(term));
+  }
+
   const scored = rows.map((r) => {
     const tf = new Map<string, number>(JSON.parse(r.keywords || "[]") as [string, number][]);
-    return { text: r.text, docPath: r.docPath, chunkIndex: r.chunkIndex, score: cosineSim(qTf, tf) };
+    // 文档向量加 IDF 权重
+    const dWeighted = new Map<string, number>();
+    for (const [term, freq] of tf) {
+      dWeighted.set(term, freq * idf(term));
+    }
+    return { text: r.text, docPath: r.docPath, chunkIndex: r.chunkIndex, score: cosineSim(qWeighted, dWeighted) };
   });
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, topK).filter((s) => s.score > 0);

@@ -595,6 +595,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         const cmd = new Deno.Command(soffice, {
           args: ["--headless", "--convert-to", "pdf", "--outdir", outDir, srcPath],
           stdout: "piped", stderr: "piped",
+          signal: AbortSignal.timeout(60_000), // 60 秒超时，防止 soffice 卡死
         });
         const r = await cmd.output();
         if (r.code !== 0) {
@@ -602,11 +603,15 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           return json({ error: `转换失败：${stderr}` });
         }
         const pdfPath = srcPath.replace(/\.(docx|xlsx|pptx|doc|xls|ppt)$/i, ".pdf");
+        // 校验输出文件确实生成
+        const stat = await Deno.stat(pdfPath).catch(() => null);
+        if (!stat || !stat.isFile) {
+          return json({ error: "转换未生成输出文件，可能 LibreOffice 版本不兼容" });
+        }
         // 登记为工件
         try {
           const { createArtifact } = await import("./src/domains/artifact/node/store.ts");
           const fileName = pdfPath.split("/").pop() || "export.pdf";
-          const stat = await Deno.stat(pdfPath).catch(() => ({ size: 0 }));
           createArtifact({ fileName, filePath: pdfPath, bytes: stat.size });
         } catch {}
         return json({ ok: true, pdfPath });

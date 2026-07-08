@@ -283,6 +283,10 @@ export const editPptxTool: AgentTool<typeof editPptxSchema, { path: string; vers
     const sessionId = activeConv?.id;
     const version = await createBackupVersion(fullPath, sessionId);
     await editPptx(fullPath, p.ops as any);
+    // 更新工件字节数（和 editXlsx/editDocx 一致）
+    const stat = await Deno.stat(fullPath).catch(() => ({ size: 0 }));
+    const art = getArtifactByPath(fullPath);
+    if (art) db.prepare("UPDATE artifacts SET bytes = ? WHERE id = ?").run(stat.size, art.id);
     return {
       content: [{ type: "text", text: `✓ 已编辑 PPT：${fullPath} ${version !== -1 ? `(原版本已备份为 v${version})` : ""}` }],
       details: { path: fullPath, version },
