@@ -38,6 +38,8 @@ export interface AgentProvider {
   abort(sessionId: string): Promise<void>;
   /** 订阅某会话的事件流 */
   onEvent(sessionId: string, cb: (e: AgentEvent) => void): Promise<() => void>;
+  /** 向某会话广播一个事件（供外部注入非 agent 事件，如工具确认请求 tool_confirmation） */
+  emitEvent(sessionId: string, event: AgentEvent): void;
   /** 销毁某会话 */
   dispose(sessionId: string): Promise<void>;
 }
@@ -166,6 +168,23 @@ export class LocalPiProvider implements AgentProvider {
     const entry = await this.ensureSession(sessionId);
     entry.listeners.add(cb);
     return () => entry.listeners.delete(cb);
+  }
+
+  /**
+   * 向某会话广播一个事件（供外部注入非 agent 事件，如工具确认请求 tool_confirmation）。
+   * 与 createWorkBuddyAgent 的事件回调走同一条 listeners 通路，
+   * 因此 SSE（onEvent 订阅）与 getQueue（onEvent → push queue）都能实时收到。
+   */
+  emitEvent(sessionId: string, event: AgentEvent): void {
+    const entry = this.sessions.get(sessionId);
+    if (!entry) return;
+    for (const cb of entry.listeners) {
+      try {
+        cb(event);
+      } catch (e) {
+        console.error("[provider] 事件监听器异常:", e);
+      }
+    }
   }
 
   async dispose(sessionId: string): Promise<void> {

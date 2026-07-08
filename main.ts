@@ -183,8 +183,11 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       appendMessage(b.sessionId, "user", b.text);
       setConfirmHandler(b.sessionId, async (toolName: string, args: unknown) => {
         const requestId = crypto.randomUUID();
-        const q = getQueue(b.sessionId);
-        q.push({ type: "tool_confirmation" as any, requestId, toolName, args, sessionId: b.sessionId } as any);
+        // 通过 provider 广播 tool_confirmation 事件，走 listeners 通路：
+        // SSE（onEvent 订阅）和 getQueue（onEvent → push queue）都能实时收到。
+        // ⚠️ 不能只 push queue：SSE 连接建立后只订阅 onEvent，不再 splice queue，
+        //    会导致确认框首次不显示、切 chat 重连后才吐出的 bug。
+        provider.emitEvent(b.sessionId, { type: "tool_confirmation" as any, requestId, toolName, args, sessionId: b.sessionId } as any);
         return await new Promise<boolean>((resolve) => {
           pendingConfirms.set(requestId, resolve);
           setTimeout(() => { if (pendingConfirms.has(requestId)) { pendingConfirms.delete(requestId); resolve(false); } }, 120000);
@@ -248,7 +251,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
     if (path.startsWith("/api/events/") && !path.includes("/stream") && req.method === "GET") {
       const id = path.split("/")[3];
       const q = getQueue(id);
-      const events = q.splice(0, q.length);
+      // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
+      const events = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
       for (const ev of events) {
         if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
           const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
@@ -273,7 +277,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
 
           // 发送已有事件（队列里积攒的）
           const q = getQueue(id);
-          const pending = q.splice(0, q.length);
+          // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
+          const pending = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
           for (const ev of pending) {
             if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
               const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
