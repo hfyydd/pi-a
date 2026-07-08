@@ -155,6 +155,16 @@ export function initDb(): DatabaseSync {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_snap_path ON file_snapshots(original_path);
+
+    CREATE TABLE IF NOT EXISTS doc_chunks (
+      id TEXT PRIMARY KEY,
+      doc_path TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      keywords TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chunks_doc ON doc_chunks(doc_path);
   `);
 
   // 补 conversations.project_id 列

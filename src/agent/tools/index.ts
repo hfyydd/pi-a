@@ -8,6 +8,7 @@ import { memoryRecallTool, memoryWriteTool } from "./memory.ts";
 import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool } from "./doc.ts";
 import { webFetchTool, webSearchTool } from "./web.ts";
 import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool } from "./os.ts";
+import { indexDocTool, searchDocsTool } from "./rag.ts";
 
 const HOME = Deno.env.get("HOME") || "/tmp";
 
@@ -43,6 +44,9 @@ export function getFullTools(): AgentTool<any>[] {
     keyTypeTool,
     appFocusTool,
     cursorPosTool,
+    // RAG 工具（功能18）
+    indexDocTool,
+    searchDocsTool,
     ...mcpTools,
   ];
 }
@@ -58,4 +62,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool };
