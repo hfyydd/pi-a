@@ -171,6 +171,8 @@ export function initDb(): DatabaseSync {
   addColumn("conversations", "project_id", "TEXT");
   // 补 conversations.expert_id 列（专家模式）
   addColumn("conversations", "expert_id", "TEXT");
+  // 补 messages.branch_id 列（会话分叉/消息树）
+  addColumn("messages", "branch_id", "TEXT DEFAULT 'main'");
   // 补 messages.parent_id 列（会话分叉：记录消息树形父节点）
   addColumn("messages", "parent_id", "TEXT");
 
