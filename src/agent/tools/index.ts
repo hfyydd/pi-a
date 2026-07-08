@@ -48,6 +48,7 @@ export function getFullTools(): AgentTool<any>[] {
     // RAG 工具（功能18）
     indexDocTool,
     searchDocsTool,
+    taskTool,
     ...mcpTools,
   ];
 }

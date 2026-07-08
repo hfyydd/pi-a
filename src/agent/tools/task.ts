@@ -7,11 +7,9 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
-import { getModels } from "../models.ts";
+import { getModels, listAllProviders } from "../models.ts";
 import { getApiKey } from "../../infra/keychain.ts";
-import { createReadOnlyTools } from "./index.ts";
-
-const HOME = Deno.env.get("HOME") || "/tmp";
+import { getReadOnlyTools } from "./index.ts";
 
 const taskSchema = Type.Object({
   description: Type.String({ description: "子任务描述（一句话，如「搜索代码库中所有 TODO」）" }),
@@ -30,10 +28,8 @@ export const taskTool: AgentTool<typeof taskSchema, { tokens: number }> = {
       // 子 Agent 用 deepseek-v4-flash（快速模型）
       let model = models.getModel("deepseek", "deepseek-v4-flash");
       if (!model) {
-        // 兜底：尝试任意已注册模型
-        const providers = models.getProviders?.() || [];
-        for (const prov of providers) {
-          const ms = models.getModels(prov);
+        // 兜底：跨已注册 provider 拿第一个可用模型
+        for (const { models: ms } of listAllProviders()) {
           if (ms && ms.length > 0) { model = ms[0]; break; }
         }
       }
@@ -44,7 +40,7 @@ export const taskTool: AgentTool<typeof taskSchema, { tokens: number }> = {
         };
       }
 
-      const roTools = createReadOnlyTools(HOME);
+      const roTools = getReadOnlyTools();
 
       // 收集子 Agent 的输出
       let output = "";
