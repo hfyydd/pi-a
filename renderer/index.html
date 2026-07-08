@@ -792,13 +792,17 @@
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <div class="menu-pop" id="perm-menu">
+                <div class="menu-item" data-perm="readonly">
+                  <span class="mi-icon">🔒</span>
+                  <div><div class="mi-title">仅阅读 (L1)</div><div class="mi-desc">只读不写，最安全</div></div>
+                </div>
                 <div class="menu-item selected" data-perm="default">
                   <span class="mi-icon">🛡️</span>
-                  <div><div class="mi-title">默认权限</div><div class="mi-desc">写操作需确认</div></div>
+                  <div><div class="mi-title">默认权限 (L2)</div><div class="mi-desc">写操作需确认</div></div>
                 </div>
                 <div class="menu-item" data-perm="full">
-                  <span class="mi-icon">⚠️</span>
-                  <div><div class="mi-title">完全访问权限</div><div class="mi-desc">全部自动执行，无需确认</div></div>
+                  <span class="mi-icon">⚡</span>
+                  <div><div class="mi-title">完全访问 (L3)</div><div class="mi-desc">全部自动执行，无需确认</div></div>
                 </div>
               </div>
             </div>
@@ -1512,9 +1516,10 @@
     }
     function setPerm(p) {
       perm = p;
-      const labels = { default: "默认权限", full: "完全访问权限" };
-      $("perm-label").textContent = labels[p];
+      const labels = { readonly: "仅阅读", default: "默认权限", full: "完全访问" };
+      $("perm-label").textContent = labels[p] || "默认权限";
       $("btn-perm").classList.toggle("active", p === "full");
+      $("btn-perm").classList.toggle("locked", p === "readonly");
       $("perm-menu").querySelectorAll(".menu-item").forEach(el => el.classList.toggle("selected", el.dataset.perm === p));
       $("perm-menu").classList.remove("show");
     }

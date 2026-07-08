@@ -14,8 +14,12 @@ import { updateConversationStatus } from "../domains/session/node/store.ts";
 /** 执行模式：Ask=仅问答 / Plan=先方案 / Craft=直接执行 */
 export type RunMode = "ask" | "plan" | "craft";
 
-/** 权限级别：default=写操作需确认 / full=全放行 */
-export type PermLevel = "default" | "full";
+/** 权限级别（三层模型，对标 WorkBuddy）：
+ * - readonly (L1)：只读，所有写工具被拦截
+ * - default  (L2)：写工具需确认（兼容旧值）
+ * - full     (L3)：完全自动，不确认（兼容旧值）
+ */
+export type PermLevel = "readonly" | "default" | "full";
 
 /** 单次 prompt 的选项（由 UI 传入） */
 export interface PromptOptions {

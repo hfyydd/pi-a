@@ -88,12 +88,20 @@ export async function checkToolPermission(
     }
   }
 
-  // 完全访问权限：全放行
+  // 完全访问权限（L3）：全放行
   if (perm === "full") {
     return { allow: true };
   }
 
-  // 默认权限：写工具需确认
+  // 只读权限（L1）：所有写工具被拦截
+  if (perm === "readonly") {
+    if (WRITE_TOOLS.has(toolName)) {
+      return { allow: false, block: true, reason: `只读模式下 ${toolName} 被禁止` };
+    }
+    return { allow: true };
+  }
+
+  // 默认权限（L2）：写工具需确认
   if (WRITE_TOOLS.has(toolName)) {
     const handler = confirmHandlers.get(sessionId);
     if (!handler) {
