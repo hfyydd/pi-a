@@ -22,7 +22,7 @@ import { RENDERER_HTML } from "./src/ui/renderer.ts";
 import { initDb } from "./src/infra/db.ts";
 import { initModels, listModels, listAllProviders, registerProvider, listAvailableProviders } from "./src/agent/models.ts";
 import { provider, type AgentEvent } from "./src/agent/provider.ts";
-import { setConfirmHandler, clearConfirmHandler } from "./src/agent/permissions.ts";
+import { setConfirmHandler, clearConfirmHandler, resetComputerUseCount } from "./src/agent/permissions.ts";
 import { ensureSkillsDir } from "./src/agent/skills.ts";
 import { startScheduler } from "./src/domains/automation/node/scheduler.ts";
 import { ensureMcpConfig, connectAllMcpServers } from "./src/agent/mcp.ts";
@@ -182,6 +182,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       console.log("[api] /api/prompt session:", b.sessionId?.slice(0,8), "mode:", b.mode);
       // 确保 queue 已订阅（在 prompt 之前）
       getQueue(b.sessionId);
+      // 新 prompt = 新任务，重置 Computer Use 步数计数
+      resetComputerUseCount(b.sessionId);
       appendMessage(b.sessionId, "user", b.text);
       setConfirmHandler(b.sessionId, async (toolName: string, args: unknown) => {
         const requestId = crypto.randomUUID();

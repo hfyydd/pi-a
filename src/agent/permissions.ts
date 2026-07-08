@@ -34,6 +34,20 @@ const DANGER_TOOLS = new Set([
   "key_type",
 ]);
 
+/**
+ * Computer Use 步数上限（对照 05 文档§三：防失控循环）。
+ * 对实际操作工具（点击/移动/键盘）按 session 计数，超过上限拒绝。
+ * screenshot/cursor_pos 是感知类，不计入。
+ */
+const COMPUTER_USE_ACTION_TOOLS = new Set(["mouse_click", "mouse_move", "key_type"]);
+const MAX_COMPUTER_USE_STEPS = 20;
+const computerUseCount = new Map<string, number>();
+
+/** 重置某会话的 Computer Use 步数计数（新任务/prompt 时调用） */
+export function resetComputerUseCount(sessionId: string): void {
+  computerUseCount.delete(sessionId);
+}
+
 /** 危险命令黑名单（正则，所有权限级别都拦截） */
 const DANGEROUS_PATTERNS: RegExp[] = [
   /rm\s+-rf?\s+\/($|\s)/i,       // rm -rf /
@@ -98,6 +112,19 @@ export async function checkToolPermission(
     if (isDangerousCommand(cmdStr)) {
       console.warn(`[permissions] 拦截到危险命令: ${cmdStr}`);
       return { allow: false, block: true, reason: "检测到危险命令，已被系统安全拦截。" };
+    }
+  }
+
+  // Computer Use 步数上限（防失控循环，05 文档§三）
+  if (COMPUTER_USE_ACTION_TOOLS.has(toolName)) {
+    const count = (computerUseCount.get(sessionId) ?? 0) + 1;
+    computerUseCount.set(sessionId, count);
+    if (count > MAX_COMPUTER_USE_STEPS) {
+      return {
+        allow: false,
+        block: true,
+        reason: `Computer Use 操作已达上限 ${MAX_COMPUTER_USE_STEPS} 步，已停止以防失控。请新开对话或调整任务后重试。`,
+      };
     }
   }
 
