@@ -409,10 +409,10 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       await deleteApiKey(providerId);
       return json({ ok: true });
     }
-    // GET /api/memories — 获取全部记忆
+    // GET /api/memories — 获取全部记忆（含 working + user，面板用）
     if (path === "/api/memories" && req.method === "GET") {
-      const { recallMemories } = await import("./src/domains/memory/node/store.ts");
-      return json(recallMemories());
+      const { listAllMemories } = await import("./src/domains/memory/node/store.ts");
+      return json(listAllMemories());
     }
     // POST /api/memories — 新增长期记忆
     if (path === "/api/memories" && req.method === "POST") {
@@ -427,6 +427,46 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const { deleteMemory } = await import("./src/domains/memory/node/store.ts");
       deleteMemory(id);
       return json({ ok: true });
+    }
+    // ===== 技能 API（技能编辑器） =====
+    // GET /api/skills — 列出所有技能
+    if (path === "/api/skills" && req.method === "GET") {
+      const { listSkills } = await import("./src/domains/skill/node/store.ts");
+      return json(await listSkills());
+    }
+    // POST /api/skills — 新建技能 { name, description, body }
+    if (path === "/api/skills" && req.method === "POST") {
+      const b = await req.json();
+      const { saveSkill } = await import("./src/domains/skill/node/store.ts");
+      try {
+        const skill = await saveSkill(b.name, b.description || "", b.body || "");
+        return json(skill);
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
+    }
+    // PUT /api/skills/:name — 编辑技能 { description, body }
+    if (path.match(/^\/api\/skills\/[^/]+$/) && req.method === "PUT") {
+      const name = path.split("/")[3];
+      const b = await req.json();
+      const { saveSkill } = await import("./src/domains/skill/node/store.ts");
+      try {
+        const skill = await saveSkill(name, b.description || "", b.body || "");
+        return json(skill);
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
+    }
+    // DELETE /api/skills/:name — 删除技能（内置不可删）
+    if (path.match(/^\/api\/skills\/[^/]+$/) && req.method === "DELETE") {
+      const name = path.split("/")[3];
+      const { deleteSkill } = await import("./src/domains/skill/node/store.ts");
+      try {
+        await deleteSkill(name);
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
     }
     // GET /api/artifacts/:id/versions — 列出版本历史
     if (path.startsWith("/api/artifacts/") && path.endsWith("/versions") && req.method === "GET") {
@@ -551,6 +591,18 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           "content-disposition": `attachment; filename="${encodeURIComponent(filename)}.${ext}"`,
         },
       });
+    }
+    // POST /api/conv/:id/fork { fromMessageId } — 从某条消息分叉出新会话
+    if (path.match(/^\/api\/conv\/[^/]+\/fork$/) && req.method === "POST") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      const { forkConversation } = await import("./src/domains/session/node/store.ts");
+      try {
+        const conv = forkConversation(id, b.fromMessageId);
+        return json(conv);
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
     }
     // ===== 项目 API =====
     if (path === "/api/projects" && req.method === "GET") {

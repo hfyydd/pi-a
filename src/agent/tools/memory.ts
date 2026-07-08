@@ -3,17 +3,26 @@
 
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { writeMemory, recallMemories } from "../../domains/memory/node/store.ts";
+import { writeMemory, recallMemories, recallWorkingMemory, recallAllMemories } from "../../domains/memory/node/store.ts";
 
-const recallSchema = Type.Object({}, { description: "无参数，召回所有记忆" });
+const recallSchema = Type.Object({
+  scope: Type.Optional(Type.Union([
+    Type.Literal("user"),
+    Type.Literal("working"),
+    Type.Literal("all"),
+  ], { description: "记忆范围：user=长期记忆(默认，跨会话) / working=工作记忆(当前任务) / all=全部" })),
+}, { description: "召回记忆，可选范围" });
 
 export const memoryRecallTool: AgentTool<typeof recallSchema, { count: number }> = {
   name: "memory_recall",
   label: "回忆",
-  description: "召回用户的长期记忆（跨会话的事实/偏好）。无需参数，返回所有记忆。",
+  description: "召回记忆。默认召回长期记忆(scope=user)；传 scope=working 召回当前任务的工作记忆；scope=all 召回全部。",
   parameters: recallSchema,
-  execute: async () => {
-    const mems = recallMemories();
+  execute: async (_id, p) => {
+    const scope = (p as any).scope ?? "user";
+    const mems = scope === "working" ? recallWorkingMemory()
+      : scope === "all" ? recallAllMemories()
+      : recallMemories();
     const text = mems.length === 0
       ? "(暂无记忆)"
       : mems.map((m) => `- [${m.kind}] ${m.content}`).join("\n");
@@ -27,15 +36,19 @@ export const memoryRecallTool: AgentTool<typeof recallSchema, { count: number }>
 const writeSchema = Type.Object({
   content: Type.String({ description: "要记住的内容" }),
   kind: Type.Optional(Type.String({ description: "记忆类型: fact/preference/note，默认 fact" })),
+  scope: Type.Optional(Type.Union([
+    Type.Literal("user"),
+    Type.Literal("working"),
+  ], { description: "记忆范围：user=长期记忆(默认，跨会话保留) / working=工作记忆(当前任务，随会话清理)" })),
 });
 
 export const memoryWriteTool: AgentTool<typeof writeSchema, { id: string }> = {
   name: "memory_write",
   label: "记住",
-  description: "把一条信息写入长期记忆（跨会话保留）。用于记住用户的事实、偏好等。提供 content 和可选 kind。",
+  description: "写入一条记忆。默认写长期记忆(scope=user，跨会话保留)；传 scope=working 写入当前任务的工作记忆。",
   parameters: writeSchema,
   execute: async (_id, p) => {
-    const mem = writeMemory(p.content, p.kind);
+    const mem = writeMemory(p.content, p.kind, (p as any).scope ?? "user");
     return {
       content: [{ type: "text", text: `✓ 已记住: ${mem.content}` }],
       details: { id: mem.id },

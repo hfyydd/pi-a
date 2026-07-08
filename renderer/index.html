@@ -507,6 +507,13 @@
     .send-btn.stop { background: var(--text); }
     .send-btn.stop:hover { background: var(--text-2); }
 
+    /* 消息分叉按钮（hover 显示） */
+    .row { position: relative; }
+    .fork-btn { position:absolute; top:4px; right:-30px; width:24px; height:24px; border-radius:6px; border:1px solid var(--border-soft); background:var(--bg); color:var(--text-3); display:none; align-items:center; justify-content:center; cursor:pointer; opacity:0; transition:opacity .12s; }
+    .row:hover .fork-btn { display:inline-flex; opacity:0.65; }
+    .fork-btn:hover { opacity:1 !important; color:var(--accent); border-color:var(--accent); }
+    .row.user .fork-btn { right:auto; left:-30px; }
+
     /* 工具确认弹窗（内联在对话流中） */
     .confirm-dialog {
       align-self: center; max-width: 440px; width: 100%;
@@ -872,6 +879,7 @@
           <button class="settings-tab" data-tab="tab-general">⚙️ 常规设置</button>
           <button class="settings-tab" data-tab="tab-memory">🧠 长期记忆</button>
           <button class="settings-tab" data-tab="tab-mcp">🔌 MCP 插件</button>
+          <button class="settings-tab" data-tab="tab-skills">⚡ 技能管理</button>
         </div>
         <!-- 内容区域 -->
         <div class="settings-content active" id="tab-model">
@@ -923,10 +931,48 @@
                 <option value="note">笔记</option>
               </select>
             </div>
+            <div style="display:flex;flex-direction:column;gap:4px;width:90px;flex-shrink:0;">
+              <label style="font-size:11px;color:var(--text-3);">范围</label>
+              <select id="mem-scope" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;">
+                <option value="user">长期</option>
+                <option value="working">工作</option>
+              </select>
+            </div>
             <button class="cd-btn cd-allow" id="btn-add-mem" style="padding:6px 12px;border-radius:6px;font-size:12.5px;height:31px;white-space:nowrap;flex-shrink:0;">添加</button>
           </div>
           <!-- 记忆列表 -->
           <div style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="memories-container"></div>
+        </div>
+
+        <div class="settings-content" id="tab-skills" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
+          <h3 style="margin-bottom:8px;font-size:14px;font-weight:600;">技能管理</h3>
+          <p style="font-size:11.5px;color:var(--text-3);margin-bottom:12px;line-height:1.4;">技能是预设的 agent 行为模板（SKILL.md）。用户提到相关任务时，agent 按描述执行。内置技能可编辑不可删。</p>
+          <div style="display:flex;gap:10px;flex:1;min-height:0;">
+            <div style="width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;padding:8px;">
+              <button class="cd-btn cd-allow" id="btn-new-skill" style="padding:6px;border-radius:6px;font-size:12px;width:100%;">+ 新建技能</button>
+              <div id="skills-list" style="display:flex;flex-direction:column;gap:4px;"></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0;">
+              <div style="display:flex;gap:8px;">
+                <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+                  <label style="font-size:11px;color:var(--text-3);">技能名（英文，新建后不可改）</label>
+                  <input type="text" id="skill-name" placeholder="my-skill" style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+                </div>
+                <div style="flex:2;display:flex;flex-direction:column;gap:4px;">
+                  <label style="font-size:11px;color:var(--text-3);">描述（触发词/一句话说明）</label>
+                  <input type="text" id="skill-desc" placeholder="技能做什么..." style="padding:6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12.5px;font-family:inherit;outline:none;" />
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-height:0;">
+                <label style="font-size:11px;color:var(--text-3);">技能正文（Markdown，agent 按此执行）</label>
+                <textarea id="skill-body" placeholder="# 技能说明&#10;当用户要求..." style="flex:1;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--mono);outline:none;resize:none;min-height:200px;"></textarea>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="cd-btn cd-deny" id="btn-del-skill" style="padding:6px 12px;border-radius:6px;font-size:12px;">删除</button>
+                <button class="cd-btn cd-allow" id="btn-save-skill" style="padding:6px 12px;border-radius:6px;font-size:12px;">保存</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="settings-content" id="tab-mcp" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
@@ -1108,6 +1154,74 @@
       if (!r.ok) throw new Error(`API ${path}: ${r.status}`);
       return r.json();
     }
+    async function apiPut(path, body) {
+      const r = await fetch(API + path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(`API ${path}: ${r.status}`);
+      return r.json();
+    }
+
+    // ===== 技能编辑器 =====
+    let currentSkillName = null;
+    async function renderSkills() {
+      const list = await apiGet("/api/skills");
+      const c = $("skills-list");
+      c.innerHTML = "";
+      if (list.length === 0) {
+        c.innerHTML = `<div style="padding:12px;text-align:center;color:var(--text-3);font-size:11.5px;">暂无技能</div>`;
+        return;
+      }
+      list.forEach(s => {
+        const btn = document.createElement("button");
+        btn.style.cssText = "padding:7px 8px;border-radius:6px;border:1px solid var(--border-soft);background:var(--bg);color:var(--text);font-size:12px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:6px;";
+        if (s.name === currentSkillName) { btn.style.borderColor = "var(--accent)"; btn.style.color = "var(--accent)"; }
+        btn.innerHTML = `<span>${s.builtin ? "🔒" : "⚡"}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.name)}</span>`;
+        btn.onclick = () => {
+          currentSkillName = s.name;
+          $("skill-name").value = s.name; $("skill-name").disabled = true;
+          $("skill-desc").value = s.description;
+          $("skill-body").value = s.body;
+          $("btn-del-skill").style.display = s.builtin ? "none" : "";
+          renderSkills();
+        };
+        c.appendChild(btn);
+      });
+    }
+    $("btn-new-skill").onclick = () => {
+      currentSkillName = null;
+      $("skill-name").value = ""; $("skill-name").disabled = false;
+      $("skill-desc").value = ""; $("skill-body").value = "";
+      $("btn-del-skill").style.display = "none";
+      renderSkills();
+    };
+    $("btn-save-skill").onclick = async () => {
+      const name = $("skill-name").value.trim();
+      const desc = $("skill-desc").value.trim();
+      const body = $("skill-body").value;
+      if (!name) return alert("请输入技能名");
+      const isEdit = currentSkillName !== null;
+      try {
+        const res = isEdit
+          ? await apiPut(`/api/skills/${name}`, { description: desc, body })
+          : await apiPost("/api/skills", { name, description: desc, body });
+        if (res.error) return alert("保存失败：" + res.error);
+        currentSkillName = name;
+        $("skill-name").disabled = true;
+        await renderSkills();
+        alert("✓ 技能已保存");
+      } catch (e) { alert("保存失败：" + (e.message || e)); }
+    };
+    $("btn-del-skill").onclick = async () => {
+      if (!currentSkillName) return;
+      if (!confirm(`确认删除技能「${currentSkillName}」？`)) return;
+      try {
+        const res = await apiDelete(`/api/skills/${currentSkillName}`);
+        if (res.error) return alert("删除失败：" + res.error);
+        currentSkillName = null;
+        $("skill-name").value = ""; $("skill-name").disabled = false;
+        $("skill-desc").value = ""; $("skill-body").value = "";
+        await renderSkills();
+      } catch (e) { alert("删除失败：" + (e.message || e)); }
+    };
     // 兼容旧调用：callBinding(name, args) → 路由到对应 API
     async function callBinding(name, args) {
       switch (name) {
@@ -1177,12 +1291,30 @@
     function scrollBottom() { chatEl.scrollTop = chatEl.scrollHeight; }
 
     // ===== 消息渲染 =====
-    function addUser(text) {
+    function forkBtnHtml() {
+      return `<button class="fork-btn" title="从此处分叉新会话" onclick="forkFromHere(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6M9 18h6a3 3 0 0 0 3-3V9"/></svg></button>`;
+    }
+    async function forkFromHere(btn) {
+      const row = btn.closest(".row");
+      const msgId = row?.dataset?.msgId;
+      if (!msgId || !currentId) return;
+      if (!confirm("从此处分叉出一个新会话？原会话保持不变。")) return;
+      try {
+        const conv = await apiPost(`/api/conv/${currentId}/fork`, { fromMessageId: msgId });
+        await loadConversations();
+        switchConv(conv.id);
+      } catch (e) {
+        alert("分叉失败：" + (e?.message || e));
+      }
+    }
+    window.forkFromHere = forkFromHere;
+    function addUser(text, msgId) {
       const row = document.createElement("div"); row.className = "row user";
-      row.innerHTML = `<div class="bubble">${esc(text)}</div>`;
+      if (msgId) row.dataset.msgId = msgId;
+      row.innerHTML = `<div class="bubble">${esc(text)}</div>${msgId ? forkBtnHtml() : ""}`;
       innerEl.appendChild(row); scrollBottom();
     }
-    function addAssistant(text, streaming) {
+    function addAssistant(text, streaming, msgId) {
       const last = innerEl.lastElementChild;
       if (streaming && last && last.dataset.role === "assistant" && last.dataset.streaming === "1") {
         last.querySelector(".content").innerHTML = md(text) + '<span class="cursor"></span>';
@@ -1193,7 +1325,8 @@
       }
       const row = document.createElement("div"); row.className = "row assistant";
       row.dataset.role = "assistant"; row.dataset.streaming = streaming ? "1" : "0";
-      row.innerHTML = `<div class="avatar assistant">π</div><div class="bubble-col"><div class="who">Pi-a</div><div class="content">${md(text)}${streaming?'<span class="cursor"></span>':""}</div></div>`;
+      if (msgId) row.dataset.msgId = msgId;
+      row.innerHTML = `<div class="avatar assistant">π</div><div class="bubble-col"><div class="who">Pi-a</div><div class="content">${md(text)}${streaming?'<span class="cursor"></span>':""}</div></div>${msgId ? forkBtnHtml() : ""}`;
       innerEl.appendChild(row); scrollBottom();
     }
     // 工具执行：开始（spinner）→ 完成（结果）
@@ -1346,8 +1479,8 @@
         convTitleEl.textContent = conv ? (conv.title || "新对话") : "对话";
         if (history.length === 0) showWelcome();
         else history.forEach(m => {
-          if (m.role === "user") addUser(m.content);
-          else if (m.role === "assistant") addAssistant(m.content, false);
+          if (m.role === "user") addUser(m.content, m.id);
+          else if (m.role === "assistant") addAssistant(m.content, false, m.id);
           else if (m.role === "tool") addToolLegacy(m.toolName || "工具", m.isError);
         });
       }
@@ -1529,7 +1662,7 @@
     const providerSelect = $("set-provider"), modelSelect = $("set-model"), saveModelBtn = $("btn-save-model");
     const docsDirInput = $("set-docs-dir"), saveGenBtn = $("btn-save-general");
     const keysList = $("keys-list");
-    const memContentInput = $("mem-content"), memKindSelect = $("mem-kind"), addMemBtn = $("btn-add-mem"), memsContainer = $("memories-container");
+    const memContentInput = $("mem-content"), memKindSelect = $("mem-kind"), memScopeSelect = $("mem-scope"), addMemBtn = $("btn-add-mem"), memsContainer = $("memories-container");
 
     // 为 sidebar 下方的“设置”图标按钮绑定 ID 和点击事件
     const setBtn = document.querySelector('aside .side-foot button[title="设置"]');
@@ -1542,7 +1675,9 @@
       setModal.classList.add("show");
       // 获取全局配置
       const cfg = await apiGet("/api/settings");
-      
+      // 加载技能列表（技能 tab 用）
+      renderSkills().catch(() => {});
+
       // 渲染 Provider 选择列表
       providerSelect.innerHTML = "";
       cfg.providers.forEach(p => {
@@ -1662,6 +1797,7 @@
         <thead>
           <tr style="background:var(--bg-subtle);border-bottom:1px solid var(--border-soft);">
             <th style="padding:8px;text-align:left;width:70px;">类别</th>
+            <th style="padding:8px;text-align:left;width:60px;">范围</th>
             <th style="padding:8px;text-align:left;">记忆内容</th>
             <th style="padding:8px;text-align:center;width:60px;">操作</th>
           </tr>
@@ -1673,8 +1809,11 @@
         const tr = document.createElement("tr");
         tr.style.cssText = "border-bottom:1px solid var(--border-soft);";
         const kindLabels = { fact: "事实", preference: "偏好", note: "笔记" };
+        const scopeLabels = { user: "长期", working: "工作", project: "项目" };
+        const scopeColor = m.scope === "working" ? "var(--accent)" : "var(--text-3)";
         tr.innerHTML = `
           <td style="padding:8px;color:var(--text-2);font-weight:600;">${esc(kindLabels[m.kind] || m.kind)}</td>
+          <td style="padding:8px;color:${scopeColor};font-weight:600;font-size:11.5px;">${esc(scopeLabels[m.scope] || m.scope)}</td>
           <td style="padding:8px;word-break:break-all;">${esc(m.content)}</td>
           <td style="padding:8px;text-align:center;">
             <button class="conv-del" onclick="deleteMemory('${m.id}')" style="opacity:1;display:inline-flex;" title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
@@ -1688,7 +1827,7 @@
     addMemBtn.onclick = async () => {
       const content = memContentInput.value.trim();
       if (!content) return alert("请输入记忆内容");
-      await apiPost("/api/memories", { content, kind: memKindSelect.value });
+      await apiPost("/api/memories", { content, kind: memKindSelect.value, scope: memScopeSelect.value });
       memContentInput.value = "";
       await renderMemories();
     };

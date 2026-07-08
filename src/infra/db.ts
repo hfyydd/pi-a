@@ -113,12 +113,22 @@ export function initDb(): DatabaseSync {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS conversation_forks (
+      src TEXT NOT NULL,
+      dst TEXT NOT NULL,
+      from_msg TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (src, dst)
+    );
   `);
 
   // 补 conversations.project_id 列
   addColumn("conversations", "project_id", "TEXT");
   // 补 conversations.expert_id 列（专家模式）
   addColumn("conversations", "expert_id", "TEXT");
+  // 补 messages.parent_id 列（会话分叉：记录消息树形父节点）
+  addColumn("messages", "parent_id", "TEXT");
 
   // 兼容旧库：补 category 列（已存在则跳过）
   addColumn("conversations", "category", "TEXT NOT NULL DEFAULT 'assistant'");

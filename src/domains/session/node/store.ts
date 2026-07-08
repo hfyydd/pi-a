@@ -23,6 +23,7 @@ export interface MessageRecord {
   toolArgs?: string;
   isError: boolean;
   createdAt: number;
+  parentId?: string;
 }
 
 function uuid(): string {
@@ -103,13 +104,13 @@ export function appendMessage(
   conversationId: string,
   role: string,
   content: string,
-  opts?: { toolName?: string; toolArgs?: string; isError?: boolean },
+  opts?: { toolName?: string; toolArgs?: string; isError?: boolean; parentId?: string },
 ): MessageRecord {
   const db = getDb();
   const id = uuid();
   const now = Date.now();
   db.prepare(
-    "INSERT INTO messages (id, conversation_id, role, content, tool_name, tool_args, is_error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO messages (id, conversation_id, role, content, tool_name, tool_args, is_error, created_at, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   ).run(
     id,
     conversationId,
@@ -119,12 +120,14 @@ export function appendMessage(
     opts?.toolArgs ?? null,
     opts?.isError ? 1 : 0,
     now,
+    opts?.parentId ?? null,
   );
   touchConversation(conversationId);
   return {
     id, conversationId, role, content,
     toolName: opts?.toolName, toolArgs: opts?.toolArgs,
     isError: opts?.isError ?? false, createdAt: now,
+    parentId: opts?.parentId,
   };
 }
 
@@ -132,6 +135,47 @@ export function appendMessage(
 export function getMessages(conversationId: string): MessageRecord[] {
   const db = getDb();
   return db.prepare(
-    "SELECT id, conversation_id as conversationId, role, content, tool_name as toolName, tool_args as toolArgs, is_error as isError, created_at as createdAt FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+    "SELECT id, conversation_id as conversationId, role, content, tool_name as toolName, tool_args as toolArgs, is_error as isError, created_at as createdAt, parent_id as parentId FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
   ).all(conversationId) as unknown as MessageRecord[];
+}
+
+/**
+ * 从某条消息处分叉出新会话（对标 WorkBuddy session/fork）。
+ * 拷贝源会话中 createdAt <= fromMsg 的消息到新会话，原会话不变。
+ * 新会话同分类、标题加" 分支"后缀，记录 fork 关系到 conversation_forks 表。
+ */
+export function forkConversation(srcId: string, fromMsgId: string): Conversation {
+  const db = getDb();
+  const srcConv = db.prepare("SELECT title, category FROM conversations WHERE id = ?").get(srcId) as
+    { title: string; category: string } | undefined;
+  if (!srcConv) throw new Error("源会话不存在");
+  const srcMsgs = getMessages(srcId);
+  const cutoff = srcMsgs.find((m) => m.id === fromMsgId);
+  if (!cutoff) throw new Error("分叉点消息不存在");
+  const keep = srcMsgs.filter((m) => m.createdAt <= cutoff.createdAt);
+
+  // 新建会话（同分类，标题加" 分支"）
+  const newConv = createConversation((srcConv.title || "对话") + " 分支", srcConv.category);
+
+  // 拷贝消息（重新生成 id，parent_id 清空——分叉后新分支根）
+  for (const m of keep) {
+    db.prepare(
+      "INSERT INTO messages (id, conversation_id, role, content, tool_name, tool_args, is_error, created_at, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      uuid(),
+      newConv.id,
+      m.role,
+      m.content,
+      m.toolName ?? null,
+      m.toolArgs ?? null,
+      m.isError ? 1 : 0,
+      m.createdAt,
+      null,
+    );
+  }
+  // 记录 fork 关系
+  db.prepare(
+    "INSERT OR REPLACE INTO conversation_forks (src, dst, from_msg, created_at) VALUES (?, ?, ?, ?)",
+  ).run(srcId, newConv.id, fromMsgId, Date.now());
+  return newConv;
 }

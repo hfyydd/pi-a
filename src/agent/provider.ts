@@ -9,7 +9,7 @@ export type { AgentEvent };
 import { createWorkBuddyAgent, type AgentHandle } from "./engine.ts";
 import { getFullTools, getReadOnlyTools } from "./tools/index.ts";
 import { getDb } from "../infra/db.ts";
-import { updateConversationStatus } from "../domains/session/node/store.ts";
+import { updateConversationStatus, getMessages } from "../domains/session/node/store.ts";
 
 /** 执行模式：Ask=仅问答 / Plan=先方案 / Craft=直接执行 */
 export type RunMode = "ask" | "plan" | "craft";
@@ -111,6 +111,18 @@ export class LocalPiProvider implements AgentProvider {
         modelId: conv?.model_id || "deepseek-v4-flash",
         systemPrompt: expertPrompt,
       });
+      // 若会话有历史消息（fork 分支或旧会话续聊），重放进 agent state，避免"失忆"
+      const history = getMessages(sessionId);
+      if (history.length > 0) {
+        (handle.agent.state as any).messages = history
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role,
+            content: [{ type: "text", text: m.content }],
+            timestamp: m.createdAt,
+          }));
+        console.log(`[provider] 会话 ${sessionId} 重放 ${history.length} 条历史消息`);
+      }
       entry = { handle, listeners, lastOpts: DEFAULT_OPTS };
       this.sessions.set(sessionId, entry);
       console.log(`[provider] 创建会话 ${sessionId} (模型: ${conv?.model_provider || "deepseek"}/${conv?.model_id || "deepseek-v4-flash"})`);

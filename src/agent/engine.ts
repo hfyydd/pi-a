@@ -10,7 +10,7 @@ import { getApiKey } from "../infra/keychain.ts";
 import { checkToolPermission, logToolCall } from "./permissions.ts";
 import { getTools } from "./tools/index.ts";
 import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
-import { recallMemories } from "../domains/memory/node/store.ts";
+import { recallMemories, recallWorkingMemory } from "../domains/memory/node/store.ts";
 
 const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
 
@@ -80,19 +80,30 @@ const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所
 </result_presentation>
 `;
 
-/** 加载记忆并注入系统提示（对标 WorkBuddy 四层记忆的简化版） */
-const MAX_MEMORY_CHARS = 5000; // 防止 prompt 爆炸
+/** 加载记忆并注入系统提示（对标 WorkBuddy 四层记忆的简化版：working + user 两层） */
+const MAX_USER_CHARS = 10000; // 长期记忆字符上限，防 prompt 爆炸
 function loadMemoryPrompt(): string {
   try {
-    const memories = recallMemories();
-    if (memories.length === 0) return "";
-    const lines = memories
-      .map((m: any) => `- [${m.kind || "fact"}] ${m.content}`)
-      .join("\n");
-    const truncated = lines.length > MAX_MEMORY_CHARS
-      ? lines.slice(0, MAX_MEMORY_CHARS) + "\n...(更多记忆已截断)"
-      : lines;
-    return `\n\n<memory>\n以下是关于用户的长期记忆，请在回答时参考：\n${truncated}\n</memory>`;
+    const userMems = recallMemories();          // scope=user 长期记忆（跨会话）
+    const workingMems = recallWorkingMemory();  // scope=working 工作记忆（当前任务级）
+    if (userMems.length === 0 && workingMems.length === 0) return "";
+    const fmt = (arr: { kind?: string; content: string }[]) =>
+      arr.length === 0 ? "(无)" : arr.map((m) => `- [${m.kind || "fact"}] ${m.content}`).join("\n");
+    const workingLines = fmt(workingMems);
+    let userLines = fmt(userMems);
+    if (userLines.length > MAX_USER_CHARS) {
+      userLines = userLines.slice(0, MAX_USER_CHARS) + "\n...(更多长期记忆已截断)";
+    }
+    return `\n\n<memory>
+<working_memory>
+以下是当前任务的工作记忆（临时，随会话清理）：
+${workingLines}
+</working_memory>
+<user_memory>
+以下是关于用户的长期记忆（跨会话保留），回答时参考：
+${userLines}
+</user_memory>
+</memory>`;
   } catch {
     return "";
   }
@@ -154,7 +165,7 @@ export function createWorkBuddyAgent(
     // 权限钩子：beforeToolCall（按会话权限级别 + 工具类型决定放行/确认/拦截）
     beforeToolCall: async (ctx) => {
       const sessionId = (agent as any).__sessionId as string | undefined;
-      const perm = (agent as any).__perm as "default" | "full" | undefined;
+      const perm = (agent as any).__perm as "readonly" | "default" | "full" | undefined;
       const d = await checkToolPermission(sessionId ?? "", perm ?? "default", ctx.toolCall.name, ctx.args);
       if (d.allow) return undefined;
       return { block: true, reason: d.reason };

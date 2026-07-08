@@ -1,11 +1,14 @@
 // src/agent/permissions.ts
-// 工具权限与审计。对照 03 文档 §3.2：
+// 工具权限与审计。对照 03 文档 §3.2 + 08 计划功能 14（三层模型）：
 //   beforeToolCall → checkToolPermission（按权限级别决定放行/拦截/求确认）
 //   afterToolCall  → logToolCall（审计落 SQLite）
 //
-// 权限模型：
-//   full    → 全部自动放行
-//   default → 读类工具放行；写类工具需用户确认（经 onConfirm 回调发 UI）
+// 三层权限模型（对标 WorkBuddy L1/L2/L3）：
+//   readonly (L1) → 只读，所有写工具直接拦截（不确认）
+//   default  (L2) → 读类放行；写类工具需用户确认（经 onConfirm 回调发 UI）
+//   full     (L3) → 全部自动放行
+//   危险命令黑名单（DANGEROUS_PATTERNS）在所有级别强制拦截。
+//   P2 预留：Computer Use 工具（mouse_click/key_type）加入后，即使 full 也强制确认（DANGER_TOOLS）。
 
 import { logToolAudit } from "../infra/db.ts";
 import type { PermLevel } from "./provider.ts";
