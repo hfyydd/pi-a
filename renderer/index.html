@@ -881,6 +881,7 @@
           <button class="settings-tab" data-tab="tab-mcp">🔌 MCP 插件</button>
           <button class="settings-tab" data-tab="tab-skills">⚡ 技能管理</button>
           <button class="settings-tab" data-tab="tab-snapshots">📸 文件快照</button>
+          <button class="settings-tab" data-tab="tab-usage">📊 用量统计</button>
         </div>
         <!-- 内容区域 -->
         <div class="settings-content active" id="tab-model">
@@ -980,6 +981,15 @@
           <h3 style="margin-bottom:8px;font-size:14px;font-weight:600;">文件快照</h3>
           <p style="font-size:11.5px;color:var(--text-3);margin-bottom:12px;line-height:1.4;">Agent 用 bash 改文件前会自动快照。可查看历史并回滚。</p>
           <div id="snapshots-files" style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;"></div>
+
+        <div class="settings-content" id="tab-usage" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
+          <h3 style="margin-bottom:8px;font-size:14px;font-weight:600;">用量统计</h3>
+          <div id="usage-summary" style="display:flex;gap:12px;margin-bottom:16px;flex-shrink:0;"></div>
+          <div style="font-weight:600;font-size:12px;color:var(--text-2);margin-bottom:8px;flex-shrink:0;">按日/模型明细</div>
+          <div style="flex:1;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="usage-table"></div>
+          <div style="font-weight:600;font-size:12px;color:var(--text-2);margin:16px 0 8px;flex-shrink:0;">工具调用审计（最近100条）</div>
+          <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border-soft);border-radius:8px;" id="audit-table"></div>
+        </div>
         </div>
 
         <div class="settings-content" id="tab-mcp" style="display:flex;flex-direction:column;height:100%;padding:16px 24px 24px;">
@@ -1689,6 +1699,8 @@
       renderSkills().catch(() => {});
       // 加载文件快照列表（快照 tab 用）
       renderSnapshots().catch(() => {});
+      // 加载用量统计（用量 tab 用）
+      renderUsage().catch(() => {});
 
       // 渲染 Provider 选择列表
       providerSelect.innerHTML = "";
@@ -2571,6 +2583,78 @@
     window.toggleAutoAction = toggleAutoAction;
 
     // ===== 文件快照面板（功能17） =====
+    // ===== 用量统计 =====
+    async function renderUsage() {
+      try {
+        const data = await apiGet("/api/usage");
+        const summary = $("usage-summary");
+        const table = $("usage-table");
+        const audit = $("audit-table");
+        // 汇总卡片
+        const t = data.totals || {};
+        const fmt = (n) => (n || 0).toLocaleString();
+        const cost = (t.totalCost || 0).toFixed(4);
+        summary.innerHTML = [
+          { label: "总 Token", val: fmt(t.totalTokens), color: "var(--accent)" },
+          { label: "总调用", val: fmt(t.totalCalls), color: "var(--green)" },
+          { label: "总费用($)", val: cost, color: "var(--amber)" },
+        ].map(c =>
+          `<div style="flex:1;background:var(--bg-subtle);padding:12px;border-radius:8px;border:1px solid var(--border-soft);text-align:center;">
+            <div style="font-size:18px;font-weight:700;color:${c.color};">${c.val}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${c.label}</div>
+          </div>`
+        ).join("");
+        // 明细表
+        const rows = data.rows || [];
+        if (rows.length === 0) {
+          table.innerHTML = `<div style="padding:30px;text-align:center;color:var(--text-3);font-size:12.5px;">暂无用量数据</div>`;
+        } else {
+          table.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--bg-subtle);">
+              <th style="padding:6px 8px;text-align:left;">日期</th>
+              <th style="padding:6px 8px;text-align:left;">模型</th>
+              <th style="padding:6px 8px;text-align:right;">输入</th>
+              <th style="padding:6px 8px;text-align:right;">输出</th>
+              <th style="padding:6px 8px;text-align:right;">总计</th>
+              <th style="padding:6px 8px;text-align:right;">费用($)</th>
+              <th style="padding:6px 8px;text-align:right;">次数</th>
+            </tr></thead><tbody>${
+            rows.map(r => `<tr style="border-bottom:1px solid var(--border-soft);">
+              <td style="padding:6px 8px;">${esc(r.date||"")}</td>
+              <td style="padding:6px 8px;">${esc(r.model||"")}</td>
+              <td style="padding:6px 8px;text-align:right;">${fmt(r.inputTokens)}</td>
+              <td style="padding:6px 8px;text-align:right;">${fmt(r.outputTokens)}</td>
+              <td style="padding:6px 8px;text-align:right;font-weight:600;">${fmt(r.totalTokens)}</td>
+              <td style="padding:6px 8px;text-align:right;">${(r.cost||0).toFixed(4)}</td>
+              <td style="padding:6px 8px;text-align:right;">${r.calls}</td>
+            </tr>`).join("")
+          }</tbody></table>`;
+        }
+        // 审计日志
+        const auditRows = await apiGet("/api/usage/audit").catch(() => []);
+        if (auditRows.length === 0) {
+          audit.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-3);font-size:12px;">暂无审计日志</div>`;
+        } else {
+          audit.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+            <thead><tr style="background:var(--bg-subtle);">
+              <th style="padding:5px 8px;text-align:left;">工具</th>
+              <th style="padding:5px 8px;text-align:left;">参数</th>
+              <th style="padding:5px 8px;text-align:center;">状态</th>
+              <th style="padding:5px 8px;text-align:left;">时间</th>
+            </tr></thead><tbody>${
+            auditRows.map(r => `<tr style="border-bottom:1px solid var(--border-soft);">
+              <td style="padding:5px 8px;font-family:var(--mono);font-weight:600;">${esc(r.toolName||"")}</td>
+              <td style="padding:5px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);">${esc((r.args||"").slice(0,80))}</td>
+              <td style="padding:5px 8px;text-align:center;color:${r.isError ? "var(--red)" : "var(--green)"};">${r.isError ? "✗" : "✓"}</td>
+              <td style="padding:5px 8px;color:var(--text-3);">${new Date(r.createdAt).toLocaleString()}</td>
+            </tr>`).join("")
+          }</tbody></table>`;
+        }
+      } catch (e) {
+        console.error("[usage] 渲染失败:", e);
+      }
+    }
+
     async function renderSnapshots() {
       const files = await apiGet("/api/file-snapshots");
       const c = $("snapshots-files");

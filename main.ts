@@ -20,6 +20,7 @@ console.log("[main] DEEPSEEK_API_KEY:", Deno.env.get("DEEPSEEK_API_KEY") ? "已�
 
 import { RENDERER_HTML } from "./src/ui/renderer.ts";
 import { initDb } from "./src/infra/db.ts";
+import { getDb } from "./src/infra/db.ts";
 import { initModels, listModels, listAllProviders, registerProvider, listAvailableProviders } from "./src/agent/models.ts";
 import { provider, type AgentEvent } from "./src/agent/provider.ts";
 import { setConfirmHandler, clearConfirmHandler, resetComputerUseCount } from "./src/agent/permissions.ts";
@@ -99,6 +100,27 @@ function getQueue(sessionId: string): AgentEvent[] {
 
 // 确认请求挂起表（API /api/confirm 用）
 const pendingConfirms = new Map<string, (approved: boolean) => void>();
+
+/** 记录 token 用量到 DB */
+function logUsage(sessionId: string, message: any) {
+  try {
+    const u = message?.usage;
+    if (!u) return;
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO usage_logs (conversation_id, provider, model, input_tokens, output_tokens, total_tokens, cost, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      sessionId,
+      message.provider || "unknown",
+      message.model || "unknown",
+      u.input || 0,
+      u.output || 0,
+      u.totalTokens || 0,
+      u.cost?.total || 0,
+      Date.now(),
+    );
+  } catch {}
+}
 
 export async function handleApi(req: Request, path: string): Promise<Response> {
   const json = (s: unknown) => new Response(JSON.stringify(s), { headers: { "content-type": "application/json" } });
@@ -261,6 +283,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
           const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
           if (text) appendMessage(id, "assistant", text);
+          logUsage(id, (ev as any).message);
         } else if (ev.type === "tool_execution_end") {
           appendMessage(id, "tool", `${(ev as any).toolName} ${(ev as any).isError ? "✗" : "✓"}`, { toolName: (ev as any).toolName, isError: (ev as any).isError });
         }
@@ -287,6 +310,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
             if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
               const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
               if (text) appendMessage(id, "assistant", text);
+          logUsage(id, (ev as any).message);
             } else if (ev.type === "tool_execution_end") {
               appendMessage(id, "tool", `${(ev as any).toolName} ${(ev as any).isError ? "✗" : "✓"}`, { toolName: (ev as any).toolName, isError: (ev as any).isError });
             }
@@ -299,6 +323,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
             if (event.type === "message_end" && (event as any).message?.role === "assistant") {
               const text = ((event as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
               if (text) appendMessage(id, "assistant", text);
+          logUsage(id, (event as any).message);
             } else if (event.type === "tool_execution_end") {
               appendMessage(id, "tool", `${(event as any).toolName} ${(event as any).isError ? "✗" : "✓"}`, { toolName: (event as any).toolName, isError: (event as any).isError });
             }
@@ -775,6 +800,28 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       return json({ ok: true });
     }
     // ===== 专家 API =====
+    // ===== 用量统计 API =====
+    // GET /api/usage — 获取 token 用量汇总（最近7天）
+    if (path === "/api/usage" && req.method === "GET") {
+      const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const rows = getDb().prepare(
+        "SELECT provider, model, SUM(input_tokens) as inputTokens, SUM(output_tokens) as outputTokens, SUM(total_tokens) as totalTokens, SUM(cost) as cost, COUNT(*) as calls, DATE(created_at/1000, 'unixepoch', 'localtime') as date FROM usage_logs WHERE created_at >= ? GROUP BY provider, model, date ORDER BY date DESC",
+      ).all(since) as any[];
+      // 总计
+      const totals = getDb().prepare(
+        "SELECT SUM(total_tokens) as totalTokens, SUM(cost) as totalCost, COUNT(*) as totalCalls FROM usage_logs WHERE created_at >= ?",
+      ).get(since) as any;
+      return json({ rows, totals: { totalTokens: totals?.totalTokens || 0, totalCost: totals?.totalCost || 0, totalCalls: totals?.totalCalls || 0 } });
+    }
+    // GET /api/usage/audit — 获取工具审计日志（最近100条）
+    if (path === "/api/usage/audit" && req.method === "GET") {
+      const { logToolAudit } = await import("./src/infra/db.ts");
+      // 直接查 DB
+      const rows = getDb().prepare(
+        "SELECT tool_name as toolName, args, is_error as isError, created_at as createdAt FROM tool_audit_log ORDER BY created_at DESC LIMIT 100",
+      ).all();
+      return json(rows);
+    }
     // GET /api/experts — 列出所有专家
     if (path === "/api/experts" && req.method === "GET") {
       return json(BUILTIN_EXPERTS);

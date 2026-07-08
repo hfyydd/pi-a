@@ -165,6 +165,20 @@ export function initDb(): DatabaseSync {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_chunks_doc ON doc_chunks(doc_path);
+
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT,
+      provider TEXT,
+      model TEXT,
+      input_tokens INTEGER DEFAULT 0,
+      output_tokens INTEGER DEFAULT 0,
+      total_tokens INTEGER DEFAULT 0,
+      cost REAL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_conv ON usage_logs(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_logs(created_at);
   `);
 
   // 补 conversations.project_id 列
