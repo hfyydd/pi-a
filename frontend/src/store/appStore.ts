@@ -4,21 +4,21 @@
 export const tokens = `
 :root {
   --bg: #ffffff;
-  --bg-subtle: #f5f5f7;
-  --bg-sidebar: #ffffff;
-  --bg-hover: #f5f5f7;
-  --bg-active: #f0f0f2;
-  --border: #ebebef;
-  --border-soft: #f2f2f4;
-  --border-strong: #e0e0e4;
+  --bg-subtle: #f3f4f6;
+  --bg-sidebar: #f8f9fa;
+  --bg-hover: #efeff1;
+  --bg-active: #e4e4e7;
+  --border: #e4e4e7;
+  --border-soft: #f1f1f4;
+  --border-strong: #d4d4d8;
   --text: #1d1d1f;
   --text-2: #515156;
   --text-3: #a1a1aa;
   --text-4: #c4c4c8;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef2ff;
-  --accent-border: #c7d2fe;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-soft: rgba(99, 102, 241, 0.08);
+  --accent-border: rgba(99, 102, 241, 0.2);
   --green: #16a34a;
   --green-soft: #f0fdf4;
   --green-border: #bbf7d0;
@@ -32,11 +32,12 @@ export const tokens = `
   --blue-border: #bfdbfe;
   --blue-text: #1e40af;
   --blue-accent: #3b82f6;
-  --brand-gradient: linear-gradient(135deg, #6366f1, #4f46e5 60%, #7c3aed);
-  --brand-shadow: 0 2px 6px rgba(79,70,229,.28);
+  --brand-gradient: linear-gradient(135deg, #818cf8, #6366f1 60%, #a78bfa);
+  --brand-shadow: 0 2px 6px rgba(99,102,241,.2);
   --code-bg: #18181b;
   --code-text: #e4e4e7;
   --overlay: rgba(0,0,0,.28);
+  --bg-dropdown: rgba(255, 255, 255, 0.85);
   --scrollbar: #d4d4d8;
   --scrollbar-hover: #a1a1aa;
   --selection: #c7d2fe;
@@ -52,22 +53,22 @@ export const tokens = `
   --cat-u: #f59e0b;
 }
 :root[data-theme="dark"] {
-  --bg: #1a1b1e;
-  --bg-subtle: #212327;
-  --bg-sidebar: #141518;
-  --bg-hover: #2a2c31;
-  --bg-active: #2ea08822;
-  --border: #34373d;
-  --border-soft: #2a2c31;
-  --border-strong: #3f4248;
+  --bg: #121214;
+  --bg-subtle: #18181b;
+  --bg-sidebar: #09090b;
+  --bg-hover: #1e1e24;
+  --bg-active: #27272a;
+  --border: #27272a;
+  --border-soft: #1e1e24;
+  --border-strong: #3f3f46;
   --text: rgba(255,255,255,.92);
   --text-2: rgba(255,255,255,.65);
   --text-3: rgba(255,255,255,.45);
   --text-4: rgba(255,255,255,.25);
   --accent: #818cf8;
   --accent-hover: #6366f1;
-  --accent-soft: rgba(99,102,241,.15);
-  --accent-border: rgba(99,102,241,.35);
+  --accent-soft: rgba(129, 140, 248, 0.12);
+  --accent-border: rgba(129, 140, 248, 0.3);
   --green: #4ed88a;
   --green-soft: rgba(22,163,74,.15);
   --green-border: rgba(78,216,138,.3);
@@ -86,6 +87,7 @@ export const tokens = `
   --code-bg: #0d0d0f;
   --code-text: #e4e4e7;
   --overlay: rgba(0,0,0,.5);
+  --bg-dropdown: rgba(18, 18, 20, 0.82);
   --scrollbar: #3f4248;
   --scrollbar-hover: #52555c;
   --selection: rgba(99,102,241,.3);

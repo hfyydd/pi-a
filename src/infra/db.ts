@@ -196,6 +196,8 @@ export function initDb(): DatabaseSync {
   addColumn("conversations", "expert_id", "TEXT");
   // 补 conversations.workspace_id 列（工作空间）
   addColumn("conversations", "workspace_id", "TEXT");
+  // 补 conversations.parent_id 列（子智能体：记录父会话 ID）
+  addColumn("conversations", "parent_id", "TEXT");
   // 补 messages.branch_id 列（会话分叉/消息树）
   addColumn("messages", "branch_id", "TEXT DEFAULT 'main'");
   // 补 messages.parent_id 列（会话分叉：记录消息树形父节点）

@@ -19,10 +19,13 @@ function PermIcon({ perm, size = 13 }: { perm: PermLevel; size?: number }) {
 
 export default function Composer() {
   const { sendMessage, abortGeneration, busy, mode, setMode, permission, setPermission,
-          currentConvId,
+          currentConvId, conversations,
           workspaces, composerWorkspaceId, setComposerWorkspaceId,
           setShowWorkspaceManager } = useStore();
   const [text, setText] = useState("");
+  const runningSubAgent = conversations.find(
+    c => c.parentId === currentConvId && c.status === "running"
+  );
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showPermMenu, setShowPermMenu] = useState(false);
   const [showWsPicker, setShowWsPicker] = useState(false);
@@ -59,7 +62,21 @@ export default function Composer() {
         <div style={{
           background: "var(--bg)", border: "1px solid var(--border-strong)",
           borderRadius: 16, boxShadow: "var(--shadow-md)",
+          display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
+          {runningSubAgent && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 16px", background: "var(--bg-sidebar)",
+              borderBottom: "1px solid var(--border)",
+              fontSize: 12, color: "var(--text-2)",
+            }}>
+              <Sparkles size={13} style={{ color: "var(--accent)" }} />
+              <span>正在调用子智能体：</span>
+              <strong style={{ color: "var(--text)", fontWeight: 600 }}>{runningSubAgent.title.replace("子任务: ", "")}</strong>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-3)" }}>处理中...</span>
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             value={text}
@@ -98,7 +115,7 @@ export default function Composer() {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               {showModeMenu && (
-                <div style={{ position: "absolute", bottom: "100%", marginBottom: 6, left: 0, background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: 11, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
+                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
                   {(["ask", "plan", "craft"] as RunMode[]).map((m) => (
                     <div key={m} onClick={() => { setMode(m); setShowModeMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
@@ -128,7 +145,7 @@ export default function Composer() {
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
                 {showPermMenu && (
-                  <div style={{ position: "absolute", bottom: "100%", marginBottom: 6, left: 0, background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: 11, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
+                  <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
                     {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
                       <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                         style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
@@ -206,7 +223,7 @@ export default function Composer() {
                 <ChevronDown size={11} />
               </button>
               {showPermMenu && (
-                <div style={{ position: "absolute", top: "100%", marginTop: 6, left: 0, background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: 11, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
+                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
                   {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
@@ -323,19 +340,20 @@ function WsPickerDropdown({
             <button className="ws-picker-action-btn" onClick={onManage}>
               <Plus size={13} />新建工作空间
             </button>
-            <label className="ws-picker-action-btn ws-picker-browse">
-              <FolderInput size={13} />打开本地文件夹
-              <input type="file" {...({ webkitdirectory: true } as React.InputHTMLAttributes<HTMLInputElement>)} style={{ display: "none" }} onChange={(e) => {
-                const files = e.target.files;
-                if (!files || files.length === 0) return;
-                const firstPath = files[0].webkitRelativePath;
-                const dirPath = "/" + firstPath.split("/").slice(0, -1).join("/");
-                const dirName = firstPath.split("/")[0] || dirPath.split("/").pop() || "新空间";
+            <button className="ws-picker-action-btn ws-picker-browse" onClick={async () => {
+              try {
+                const res = await fetch("/api/pick-dir");
+                const data = await res.json();
+                if (data.cancelled || !data.path) return;
                 onManage();
                 onClose();
-                useStore.getState()._pendingDirPath = { name: dirName, path: dirPath };
-              }} />
-            </label>
+                useStore.getState()._pendingDirPath = { name: data.name, path: data.path };
+              } catch (e) {
+                console.error("[pick-dir] error:", e);
+              }
+            }}>
+              <FolderInput size={13} />打开本地文件夹
+            </button>
           </div>
         </div>
       )}

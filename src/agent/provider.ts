@@ -9,7 +9,8 @@ export type { AgentEvent };
 import { createWorkBuddyAgent, type AgentHandle } from "./engine.ts";
 import { getFullTools, getReadOnlyTools } from "./tools/index.ts";
 import { getDb } from "../infra/db.ts";
-import { updateConversationStatus, getMessages } from "../domains/session/node/store.ts";
+import { updateConversationStatus, getMessages, appendMessage } from "../domains/session/node/store.ts";
+import { sessionContext } from "../infra/context.ts";
 
 /** 执行模式：Ask=仅问答 / Plan=先方案 / Craft=直接执行 */
 export type RunMode = "ask" | "plan" | "craft";
@@ -148,12 +149,40 @@ export class LocalPiProvider implements AgentProvider {
     // 标记会话为运行中
     updateConversationStatus(sessionId, "running");
 
-    agent.prompt(text).then(() => {
-      console.log(`[provider] 会话 ${sessionId} prompt 完成`);
-      updateConversationStatus(sessionId, "done");
-    }).catch((e) => {
-      console.error(`[provider] 会话 ${sessionId} prompt 失败:`, e?.message || e);
-      updateConversationStatus(sessionId, "failed");
+    sessionContext.run({ sessionId }, () => {
+      agent.prompt(text).then(() => {
+        console.log(`[provider] 会话 ${sessionId} prompt 完成`);
+        updateConversationStatus(sessionId, "done");
+      }).catch((e) => {
+        const errorMsg = "出错了：" + (e?.message || String(e));
+        console.error(`[provider] 会话 ${sessionId} prompt 失败:`, errorMsg);
+        updateConversationStatus(sessionId, "failed");
+
+        // 1. 将错误信息追加到数据库记录中
+        appendMessage(sessionId, "assistant", errorMsg);
+
+        // 2. 向上层 SSE / 轮询队列广播消息更新，将错误渲染到界面
+        this.emitEvent(sessionId, {
+          type: "message_update" as any,
+          sessionId,
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: errorMsg }]
+          }
+        } as any);
+
+        this.emitEvent(sessionId, {
+          type: "message_end" as any,
+          sessionId,
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: errorMsg }]
+          }
+        } as any);
+
+        // 3. 广播 agent_end 事件，解锁 UI
+        this.emitEvent(sessionId, { type: "agent_end" } as any);
+      });
     });
   }
 

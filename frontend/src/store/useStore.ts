@@ -13,6 +13,7 @@ export interface Conversation {
   modelProvider: string;
   modelId: string;
   workspaceId?: string;
+  parentId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -31,8 +32,18 @@ export interface Message {
   role: string;
   content: string;
   toolName?: string;
+  toolArgs?: string;
   isError?: boolean;
+  status?: "running" | "success" | "error";
   createdAt: number;
+}
+
+/** 工具确认请求（对标 WorkBuddy permissionRequest） */
+export interface PendingConfirm {
+  requestId: string;
+  toolName: string;
+  args: any;
+  sessionId: string;
 }
 
 interface AppState {
@@ -60,6 +71,10 @@ interface AppState {
   modelId: string;       // 当前选择的模型 ID（如 "Hy3", "deepseek-v4-flash"）
   modelProvider: string; // 当前模型提供商（如 "zhipu", "deepseek"）
 
+  // 工具确认（对标 WorkBuddy permissionRequest 弹窗）
+  pendingConfirm: PendingConfirm | null;
+  respondConfirm: (approved: boolean) => Promise<void>;
+
   // UI 面板
   showSettings: boolean;
   showArtifacts: boolean;
@@ -72,6 +87,7 @@ interface AppState {
   loadConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   createConversation: (title?: string) => Promise<string>;
+  resetToWelcome: () => void;  // 回到起始页（欢迎屏 + 工作空间选择器），不直接建会话
   deleteConversation: (id: string) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   abortGeneration: () => Promise<void>;
@@ -94,6 +110,38 @@ interface AppState {
 
 let sseSource: EventSource | null = null;
 
+function connectSSE(id: string, set: any, get: any) {
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+  try {
+    const source = new EventSource("/api/events/" + id + "/stream");
+    sseSource = source;
+    source.onmessage = (e) => {
+      try {
+        const ev = JSON.parse(e.data);
+        handleEvent(ev, set, get);
+      } catch {}
+    };
+    source.onerror = () => {
+      source.close();
+      if (sseSource === source) {
+        sseSource = null;
+      }
+      // 3秒后尝试重连（如果依然处于当前会话且未连接）
+      setTimeout(() => {
+        if (get().currentConvId === id && !sseSource) {
+          console.log("[SSE] 正在尝试重新连接事件流...");
+          connectSSE(id, set, get);
+        }
+      }, 3000);
+    };
+  } catch (err) {
+    console.error("[SSE] 创建连接失败:", err);
+  }
+}
+
 export const useStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   activeCategory: "assistant",
@@ -107,6 +155,18 @@ export const useStore = create<AppState>((set, get) => ({
   mode: "craft",
   permission: "default",
   theme: "light",
+  pendingConfirm: null,
+
+  respondConfirm: async (approved: boolean) => {
+    const confirm = get().pendingConfirm;
+    if (!confirm) return;
+    set({ pendingConfirm: null });
+    try {
+      await apiPost("/api/confirm", { requestId: confirm.requestId, approved });
+    } catch (e) {
+      console.error("[confirm] 发送确认响应失败:", e);
+    }
+  },
 
   // 模型
   modelId: "deepseek-v4-flash",
@@ -144,18 +204,7 @@ export const useStore = create<AppState>((set, get) => ({
       set({ messages: msgs });
     } catch {}
     // 开启 SSE
-    try {
-      sseSource = new EventSource("/api/events/" + id + "/stream");
-      sseSource.onmessage = (e) => {
-        try {
-          const ev = JSON.parse(e.data);
-          handleEvent(ev, set, get);
-        } catch {}
-      };
-      sseSource.onerror = () => {
-        if (sseSource) { sseSource.close(); sseSource = null; }
-      };
-    } catch {}
+    connectSSE(id, set, get);
   },
 
   createConversation: async (title = "新对话") => {
@@ -164,8 +213,14 @@ export const useStore = create<AppState>((set, get) => ({
     // 建完即复位：下一次「开始对话」默认不归属任何空间（任务）
     set({ composerWorkspaceId: null });
     await get().loadConversations();
-    get().selectConversation(conv.id);
+    await get().selectConversation(conv.id);
     return conv.id;
+  },
+
+  resetToWelcome: () => {
+    // 关闭旧 SSE，回到起始页
+    if (sseSource) { sseSource.close(); sseSource = null; }
+    set({ currentConvId: null, messages: [], composerWorkspaceId: null, busy: false });
   },
 
   deleteConversation: async (id) => {
@@ -183,11 +238,16 @@ export const useStore = create<AppState>((set, get) => ({
     if (!convId) {
       convId = await get().createConversation(text.slice(0, 24));
     }
-    // 添加用户消息到 UI
-    set((st) => ({
-      messages: [...st.messages, { id: crypto.randomUUID(), role: "user", content: text, createdAt: Date.now() }],
+    // 确保 SSE 连接就绪
+    if (!sseSource && convId) {
+      connectSSE(convId, set, get);
+    }
+    // 添加用户消息到 UI（用 get() 获取最新 messages，避免被 selectConversation 覆盖）
+    const currentMsgs = get().messages;
+    set({
+      messages: [...currentMsgs, { id: crypto.randomUUID(), role: "user", content: text, createdAt: Date.now() }],
       busy: true,
-    }));
+    });
     try {
       await apiPost("/api/prompt", {
         sessionId: convId,
@@ -268,6 +328,20 @@ export const useStore = create<AppState>((set, get) => ({
 }));
 
 // SSE 事件处理
+function getToolOutputString(output: unknown): string {
+  if (!output) return "";
+  if (typeof output === "string") return output;
+  const anyOutput = output as any;
+  if (Array.isArray(anyOutput.content)) {
+    return anyOutput.content
+      .filter((c: any) => c.type === "text")
+      .map((c: any) => c.text)
+      .join("\n");
+  }
+  if (typeof anyOutput.text === "string") return anyOutput.text;
+  return JSON.stringify(output);
+}
+
 function handleEvent(ev: any, set: any, get: any) {
   if (ev.type === "agent_start") {
     // 思考中状态由 UI 根据 busy 自动渲染
@@ -300,17 +374,43 @@ function handleEvent(ev: any, set: any, get: any) {
     }
   } else if (ev.type === "tool_execution_start") {
     set((st: AppState) => ({
-      messages: [...st.messages, { id: ev.toolCallId, role: "tool", content: ev.toolName, toolName: ev.toolName, createdAt: Date.now(), isError: false } as any],
+      messages: [...st.messages, {
+        id: ev.toolCallId,
+        role: "tool",
+        content: "",
+        toolName: ev.toolName,
+        toolArgs: typeof ev.args === "string" ? ev.args : JSON.stringify(ev.args ?? {}),
+        status: "running",
+        createdAt: Date.now(),
+        isError: false
+      } as any],
     }));
   } else if (ev.type === "tool_execution_end") {
     set((st: AppState) => {
+      const outputStr = getToolOutputString(ev.output);
       const msgs = st.messages.map((m) =>
-        m.id === ev.toolCallId ? { ...m, content: ev.toolName, isError: ev.isError } : m
+        m.id === ev.toolCallId ? {
+          ...m,
+          content: outputStr,
+          status: ev.isError ? "error" : "success",
+          isError: ev.isError
+        } : m
       );
       return { messages: msgs };
     });
   } else if (ev.type === "agent_end") {
     set({ busy: false });
     get().loadConversations();
+  } else if (ev.type === "tool_confirmation") {
+    // 对标 WorkBuddy permissionRequest 流程：
+    // 后端发来工具确认请求，展示确认弹窗
+    set({
+      pendingConfirm: {
+        requestId: ev.requestId,
+        toolName: ev.toolName,
+        args: ev.args,
+        sessionId: ev.sessionId,
+      },
+    });
   }
 }

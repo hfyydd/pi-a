@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
   Search, Plus, Settings, PanelLeft, Sun, Moon, MessageSquare,
-  FolderKanban, Star, Cog, Trash2, MoreHorizontal, FolderInput,
-  ChevronDown, ChevronRight,
+  FolderKanban, Star, Cog, Trash2, MoreHorizontal, FolderInput, SlidersHorizontal,
+  ChevronDown, ChevronRight, X, RotateCcw, Check,
 } from "lucide-react";
 import "./Sidebar.css";
 import { WorkspaceIcon } from "./WorkspaceIcon";
@@ -23,6 +23,23 @@ const STATUS_COLORS: Record<string, string> = {
   pending: "var(--text-3)",
   planning: "var(--amber)",
 };
+
+/* 筛选选项（对齐 WorkBuddy 截图2） */
+const STATUS_OPTIONS = [
+  { key: "", label: "全部状态" },
+  { key: "running", label: "进行中" },
+  { key: "done", label: "已完成" },
+  { key: "failed", label: "失败" },
+  { key: "pending", label: "待处理" },
+  { key: "planning", label: "规划中" },
+] as const;
+
+const TIME_OPTIONS = [
+  { key: "", label: "全部时间" },
+  { key: "today", label: "今天" },
+  { key: "week", label: "最近 7 天" },
+  { key: "month", label: "最近 30 天" },
+] as const;
 
 function timeAgo(ts: number): string {
   const d = Date.now() - ts;
@@ -170,25 +187,67 @@ function WorkspaceItem({ ws, convs }: {
 export default function Sidebar() {
   const {
     activeCategory, setCategory, conversations,
-    createConversation,
+    resetToWelcome,
     toggleSidebar, searchQuery, theme, toggleTheme, setShowSettings,
     workspaces,
   } = useStore();
 
-  // 分离：未归入空间的会话（任务）vs 按空间分组的会话
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterTime, setFilterTime] = useState("");
+
+  // 点击空白处关闭筛选面板（搜索弹窗有独立遮罩，不在此处理）
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest(".sidebar-titlebar")) return;
+      setFilterOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [filterOpen]);
+
+  // 时间过滤辅助
+  const timeFilterMs = useMemo(() => {
+    if (filterTime === "today") return 86400000;
+    if (filterTime === "week") return 604800000;
+    if (filterTime === "month") return 2592000000;
+    return Infinity;
+  }, [filterTime]);
+
+  // 分离 + 过滤：未归入空间的会话（任务）vs 按空间分组的会话
   const { taskConvs, spaceMap } = useMemo(() => {
+    const now = Date.now();
     const map = new Map<string, typeof conversations>();
     for (const ws of workspaces) map.set(ws.id, []);
     const tasks: typeof conversations = [];
     for (const c of conversations) {
+      // 状态过滤
+      if (filterStatus && c.status !== filterStatus) {
+        // 未归入空间的任务跳过，空间的也跳过
+        if (!c.workspaceId || !map.has(c.workspaceId)) continue;
+        // 有空间归属的继续走空间分组
+      }
+      // 时间过滤
+      if (now - (c.updatedAt || 0) > timeFilterMs) {
+        if (!c.workspaceId || !map.has(c.workspaceId)) continue;
+      }
       if (c.workspaceId && map.has(c.workspaceId)) {
         map.get(c.workspaceId)!.push(c);
       } else {
         tasks.push(c);
       }
     }
+    // 统一按最近更新排序
+    const sortFn = (a: typeof conversations[number], b: typeof conversations[number]) =>
+      (b.updatedAt || 0) - (a.updatedAt || 0);
+    tasks.sort(sortFn);
+    for (const [, v] of map) v.sort(sortFn);
     return { taskConvs: tasks, spaceMap: map };
-  }, [conversations, workspaces]);
+  }, [conversations, workspaces, filterStatus, timeFilterMs]);
 
   // 各空间的会话计数
   const spaceTotal = workspaces.reduce((sum, ws) => sum + (spaceMap.get(ws.id)?.length || 0), 0);
@@ -204,11 +263,28 @@ export default function Sidebar() {
           <div className="sidebar-brand-icon">π</div>
           <span className="sidebar-brand-name">Pi-a</span>
         </div>
+        {/* 检索 / 筛选（标题栏右侧，对齐 WorkBuddy） */}
+        <div className="sidebar-titlebar-actions">
+          <button
+            className={`sidebar-icon-btn ${searchOpen ? "active" : ""}`}
+            title="检索"
+            onClick={() => { setSearchOpen(true); setLocalSearchQuery(searchQuery); }}
+          >
+            <Search size={16} />
+          </button>
+          <button
+            className={`sidebar-icon-btn ${filterOpen ? "active" : ""}`}
+            title="筛选"
+            onClick={() => setFilterOpen((v) => !v)}
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+        </div>
       </div>
 
       {/* ── 新建任务按钮 ── */}
       <div className="sidebar-new-task">
-        <button className="new-task-btn" onClick={() => createConversation()}>
+        <button className="new-task-btn" onClick={() => resetToWelcome()}>
           <Plus size={16} strokeWidth={2.5} />
           <span>新建任务</span>
         </button>
@@ -249,19 +325,111 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* ── 搜索 ── */}
-      <div className="sidebar-search">
-        <Search size={13} color="var(--text-3)" />
-        <input
-          className="sidebar-search-input"
-          value={searchQuery}
-          onChange={(e) => {
-            useStore.setState({ searchQuery: e.target.value });
-            useStore.getState().loadConversations();
-          }}
-          placeholder="搜索对话…"
-        />
-      </div>
+      {/* ── 筛选下拉菜单（状态 + 时间，挂载在侧边栏根级） ── */}
+      {filterOpen && (
+        <div className="sidebar-filter-menu" onClick={(e) => e.stopPropagation()}>
+          <div className="filter-section-label">状态</div>
+          {STATUS_OPTIONS.map(({ key, label }) => (
+            <button
+              key={key || "all-status"}
+              className={`sidebar-filter-item ${filterStatus === key ? "active" : ""}`}
+              onClick={() => setFilterStatus(key)}
+            >
+              <span className="filter-item-label">{label}</span>
+              {filterStatus === key && <Check size={13} />}
+            </button>
+          ))}
+          <div className="filter-section-label">筛选时间</div>
+          {TIME_OPTIONS.map(({ key, label }) => (
+            <button
+              key={key || "all-time"}
+              className={`sidebar-filter-item ${filterTime === key ? "active" : ""}`}
+              onClick={() => setFilterTime(key)}
+            >
+              <span className="filter-item-label">{label}</span>
+              {filterTime === key && <Check size={13} />}
+            </button>
+          ))}
+          <div className="filter-divider" />
+          <button
+            className="sidebar-filter-reset"
+            onClick={() => { setFilterStatus(""); setFilterTime(""); }}
+          >
+            <RotateCcw size={12} />
+            重置筛选条件
+          </button>
+        </div>
+      )}
+
+      {/* ═══════ 检索弹窗（全屏遮罩，对齐 WorkBuddy 截图1） ═══════ */}
+      {searchOpen && (
+        <div className="search-overlay" onClick={() => setSearchOpen(false)}>
+          <div className="search-modal" onClick={(e) => e.stopPropagation()}>
+            {/* 搜索框头部 */}
+            <div className="search-header">
+              <Search size={16} color="var(--text-3)" />
+              <input
+                className="search-input"
+                autoFocus
+                value={localSearchQuery}
+                onChange={(e) => {
+                  setLocalSearchQuery(e.target.value);
+                  useStore.setState({ searchQuery: e.target.value });
+                  useStore.getState().loadConversations();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearchOpen(false);
+                }}
+                placeholder="搜索任务"
+              />
+              <button className="search-close-btn" onClick={() => setSearchOpen(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* 结果列表 */}
+            <div className="search-results">
+              {localSearchQuery.trim() && conversations.length > 0 ? (
+                (() => {
+                  const q = localSearchQuery.toLowerCase();
+                  const hits = conversations
+                    .filter(c => (c.title || "").toLowerCase().includes(q))
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .slice(0, 50);
+                  if (hits.length === 0) {
+                    return <div className="search-empty">未找到匹配的任务</div>;
+                  }
+                  return hits.map(c => {
+                    const ws = c.workspaceId ? workspaces.find(w => w.id === c.workspaceId) : null;
+                    return (
+                      <div
+                        key={c.id}
+                        className="search-result-item"
+                        onClick={() => { useStore.getState().selectConversation(c.id); setSearchOpen(false); }}
+                      >
+                        <div className="search-result-title">{c.title || "新任务"}</div>
+                        <div className="search-result-meta">
+                          <span className="search-result-time">{timeAgo(c.updatedAt)}</span>
+                          {ws && (
+                            <>
+                              <WorkspaceIcon name={ws.icon} size={12} />
+                              <span className="search-result-ws">{ws.name}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
+              ) : localSearchQuery.trim() ? (
+                <div className="search-empty">未找到匹配的任务</div>
+              ) : (
+                <div className="search-empty">输入关键词搜索任务</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════ 会话列表区域 ═══════ */}
       <div className="sidebar-list-area">

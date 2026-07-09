@@ -3,51 +3,84 @@ import { useStore } from "../store/useStore";
 import "./ChatArea.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2, Wrench } from "lucide-react";
+import { getRandomTip } from "../utils/loadingTips";
+import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2 } from "lucide-react";
 
 
-/** 工具卡片组件（照 WorkBuddy ToolCard 模式） */
-function ToolCard({ name, status, args, result }: { name: string; status: "running" | "success" | "error"; args?: string; result?: string }) {
+/** 工具卡片组件（对标 WorkBuddy：内联折叠式，支持点击展开查看详情） */
+function ToolCard({
+  name,
+  status,
+  args,
+  content,
+}: {
+  name: string;
+  status: "running" | "success" | "error";
+  args?: string;
+  content?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const statusIcon = status === "error" ? <X size={13} /> : status === "running" ? <Loader2 size={13} className="tool-spin" /> : <Check size={13} />;
+  const statusIcon = status === "error" ? <X size={12} /> : status === "running" ? <Loader2 size={12} className="tool-spin" /> : <Check size={12} />;
+  const statusText = status === "running" ? "执行中..." : status === "error" ? "失败" : "运行成功";
   const outcomeClass = status === "error" ? "error" : status === "running" ? "pending" : "success";
 
+  // 解析命令参数
+  let commandText = "";
+  try {
+    if (args) {
+      const parsed = JSON.parse(args);
+      commandText = parsed.command || JSON.stringify(parsed);
+    }
+  } catch {
+    commandText = args || "";
+  }
+
+  const toolLabel: Record<string, string> = {
+    bash: "bash",
+    write: "写入文件",
+    edit: "编辑文件",
+    read: "读取文件",
+    memory_write: "记忆",
+    memory_recall: "回忆",
+    web_search: "搜索",
+    web_fetch: "抓取网页",
+    screenshot: "截图",
+    mouse_click: "点击",
+    key_type: "键入",
+  };
+  const label = toolLabel[name] || name;
+
   return (
-    <div className="tool-card-container">
-      <div className={`tool-card ${outcomeClass}`}>
-        <div className="tool-inner" onClick={() => setExpanded(!expanded)} style={{ cursor: "pointer" }}>
-          <div className="card-header">
-            <div className="card-header-top">
-              <div className="left">
-                <span className="tool-icon">{statusIcon}</span>
-                <span className="tool-name">{name}</span>
-              </div>
-              <div className="right">
-                <span className={`tool-status ${outcomeClass}`}>
-                  {status === "running" ? "执行中" : status === "error" ? "失败" : "完成"}
-                </span>
-                {(args || result) && <ChevronDown size={14} className={`tool-chevron ${expanded ? "expanded" : ""}`} />}
-              </div>
-            </div>
-          </div>
-          {expanded && (args || result) && (
-            <div className="card-content">
-              {args && (
-                <div className="tool-section">
-                  <div className="tool-section-title">参数</div>
-                  <pre className="tool-detail">{args}</pre>
-                </div>
-              )}
-              {result && (
-                <div className="tool-section">
-                  <div className="tool-section-title">结果</div>
-                  <pre className="tool-detail">{result}</pre>
-                </div>
-              )}
-            </div>
+    <div className={`tool-collapsible-wrapper ${outcomeClass}`}>
+      {/* 头部折叠控制条 */}
+      <div
+        className={`tool-inline-header ${outcomeClass} ${expanded ? "expanded" : ""}`}
+        onClick={() => setExpanded(!expanded)}
+        role="button"
+        tabIndex={0}
+      >
+        <span className={`tool-inline-icon ${outcomeClass}`}>{statusIcon}</span>
+        <span className="tool-inline-name">
+          {name === "bash" && commandText ? `运行 ${commandText.slice(0, 45)}${commandText.length > 45 ? "..." : ""}` : label}
+        </span>
+        <span className={`tool-inline-status ${outcomeClass}`}>{statusText}</span>
+        <ChevronDown size={12} className={`tool-inline-chevron ${expanded ? "expanded" : ""}`} />
+      </div>
+
+      {/* 展开后的详细内容板 */}
+      {expanded && (
+        <div className="tool-details-panel">
+          {commandText && (
+            <pre className="tool-card-box-code command">{commandText}</pre>
+          )}
+
+          {content && (
+            <pre className="tool-card-box-code output" style={{ marginTop: 6 }}>
+              {content}
+            </pre>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -73,6 +106,44 @@ function AssistantContent({ content, streaming }: { content: string; streaming: 
         </ReactMarkdown>
       </div>
       {streaming && <span className="streaming-cursor" />}
+    </div>
+  );
+}
+
+function ThinkingBubble() {
+  const [tip, setTip] = useState("");
+  useEffect(() => {
+    setTip(getRandomTip());
+  }, []);
+
+  return (
+    <div className="chatMessageContainer assistantRow">
+      <div className="avatarWrapper">
+        <div className="assistantAvatar">π</div>
+      </div>
+      <div className="assistantMessage" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="loadingDots" style={{ display: "inline-flex" }}>
+            <span className="dot" /><span className="dot" /><span className="dot" />
+          </div>
+          <span style={{ fontSize: 13, color: "var(--text-3)" }}>生成回复中</span>
+        </div>
+        {tip && (
+          <div style={{
+            fontSize: 12,
+            color: "var(--text-3)",
+            background: "var(--bg-sidebar)",
+            border: "1px solid var(--border-soft)",
+            padding: "5px 12px",
+            borderRadius: 8,
+            maxWidth: "fit-content",
+            marginTop: 2,
+            lineHeight: 1.4,
+          }}>
+            {tip}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -157,34 +228,22 @@ export default function ChatArea() {
                 </div>
               );
             }
-            // tool message
+            // tool message — 内联折叠，无单独头像（对标 WorkBuddy）
             return (
-              <div key={msg.id} className="chatMessageContainer assistantRow" style={{ alignItems: "center" }}>
-                <div className="avatarWrapper" style={{ opacity: 0.7 }}>
-                  <div className="assistantAvatar"><Wrench size={14} /></div>
-                </div>
-                <div className="assistantMessage">
-                  <ToolCard
-                    name={msg.toolName || "工具"}
-                    status={msg.isError ? "error" : "success"}
-                  />
-                </div>
+              <div key={msg.id} className="tool-inline-row">
+                <ToolCard
+                  name={msg.toolName || "工具"}
+                  status={msg.status || (msg.isError ? "error" : "success")}
+                  args={msg.toolArgs}
+                  content={msg.content}
+                />
               </div>
             );
           })}
 
           {/* 思考中指示器 */}
           {showThinking && (
-            <div className="chatMessageContainer assistantRow">
-              <div className="avatarWrapper">
-                <div className="assistantAvatar">π</div>
-              </div>
-              <div className="assistantMessage">
-                <div className="loadingDots">
-                  <span className="dot" /><span className="dot" /><span className="dot" />
-                </div>
-              </div>
-            </div>
+            <ThinkingBubble />
           )}
         </div>
 
@@ -237,7 +296,7 @@ function WelcomeScreen() {
 
   return (
     <div className="welcome-screen">
-      {/* 标题区 — 左对齐 */}
+      {/* 标题区 — 居中对齐 */}
       <div className="welcome-header">
         <h1 className="welcome-title">Pi-a</h1>
         <p className="welcome-subtitle">你的本地 AI 超能力</p>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useStore } from "../store/useStore";
-import { X, Trash2, Pencil, Check } from "lucide-react";
+import { X, Trash2, Pencil, Check, FolderOpen } from "lucide-react";
 import { WorkspaceIcon, WORKSPACE_ICON_CHOICES } from "./WorkspaceIcon";
 
 const ICON_CHOICES = WORKSPACE_ICON_CHOICES;
@@ -121,11 +121,23 @@ export default function WorkspaceModal() {
             {/* 关联目录 — 核心字段 */}
             <label className="ws-field">
               <span>关联目录</span>
-              <input
-                className="ws-input" value={form.dirPath}
-                placeholder="如：/Users/hanfeng/Desktop/pi-a"
-                onChange={(e) => setForm({ ...form, dirPath: e.target.value })}
-              />
+              <div className="ws-input-row">
+                <input
+                  className="ws-input" value={form.dirPath}
+                  placeholder="如：/Users/hanfeng/Desktop/pi-a"
+                  onChange={(e) => setForm({ ...form, dirPath: e.target.value })}
+                />
+                <button className="ws-browse-btn" title="浏览" onClick={async () => {
+                  try {
+                    const res = await fetch("/api/pick-dir");
+                    const data = await res.json();
+                    if (data.cancelled || !data.path) return;
+                    setForm((prev) => ({ ...prev, dirPath: data.path, name: prev.name || data.name }));
+                  } catch (e) {
+                    console.error("[pick-dir] error:", e);
+                  }
+                }}><FolderOpen size={14} /></button>
+              </div>
             </label>
 
             {/* 图标 */}

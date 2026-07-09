@@ -79,14 +79,56 @@ console.log("[main] 可用 DeepSeek 模型:", listModels("deepseek").map((m: any
 // ===== 事件队列：每会话一个，前端轮询拉取 =====
 // MVP 用轮询模型（最简）；P1 研究 deno desktop 的事件主动推送 API
 const eventQueues = new Map<string, AgentEvent[]>();
+const toolArgsMap = new Map<string, string>(); // toolCallId -> JSON string of args
+
+function getToolOutputString(output: unknown): string {
+  if (!output) return "";
+  if (typeof output === "string") return output;
+  const anyOutput = output as any;
+  if (Array.isArray(anyOutput.content)) {
+    return anyOutput.content
+      .filter((c: any) => c.type === "text")
+      .map((c: any) => c.text)
+      .join("\n");
+  }
+  if (typeof anyOutput.text === "string") return anyOutput.text;
+  return JSON.stringify(output);
+}
 
 function getQueue(sessionId: string): AgentEvent[] {
   let q = eventQueues.get(sessionId);
   if (!q) {
     q = [];
     eventQueues.set(sessionId, q);
-    // 订阅该会话的 provider 事件 → 入队
+    // 订阅该会话的 provider 事件 → 入队 并持久化到数据库
     provider.onEvent(sessionId, (event) => {
+      // 拦截并持久化消息到 SQLite（统一入口，避免 SSE 和轮询重复写入）
+      try {
+        if (event.type === "tool_execution_start") {
+          const toolCallId = (event as any).toolCallId;
+          const args = (event as any).args;
+          if (toolCallId && args) {
+            toolArgsMap.set(toolCallId, typeof args === "string" ? args : JSON.stringify(args));
+          }
+        } else if (event.type === "message_end" && (event as any).message?.role === "assistant") {
+          const text = ((event as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+          if (text) appendMessage(sessionId, "assistant", text);
+          logUsage(sessionId, (event as any).message);
+        } else if (event.type === "tool_execution_end") {
+          const toolCallId = (event as any).toolCallId;
+          const argsStr = toolCallId ? toolArgsMap.get(toolCallId) : undefined;
+          if (toolCallId) toolArgsMap.delete(toolCallId);
+          const outputStr = getToolOutputString((event as any).output);
+          appendMessage(sessionId, "tool", outputStr, {
+            toolName: (event as any).toolName,
+            toolArgs: argsStr,
+            isError: (event as any).isError
+          });
+        }
+      } catch (dbErr) {
+        console.error("[queue] 消息持久化异常:", dbErr);
+      }
+
       q!.push(event);
       console.log("[queue] 事件入队:", sessionId.slice(0,8), event.type, "队列长度:", q!.length);
       // 限制队列长度，防止前端长时间不拉取导致内存膨胀
@@ -283,15 +325,6 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const q = getQueue(id);
       // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
       const events = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
-      for (const ev of events) {
-        if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
-          const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-          if (text) appendMessage(id, "assistant", text);
-          logUsage(id, (ev as any).message);
-        } else if (ev.type === "tool_execution_end") {
-          appendMessage(id, "tool", `${(ev as any).toolName} ${(ev as any).isError ? "✗" : "✓"}`, { toolName: (ev as any).toolName, isError: (ev as any).isError });
-        }
-      }
       return json(events);
     }
     // GET /api/events/:id/stream — SSE 实时推送
@@ -311,26 +344,12 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
           const pending = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
           for (const ev of pending) {
-            if (ev.type === "message_end" && (ev as any).message?.role === "assistant") {
-              const text = ((ev as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-              if (text) appendMessage(id, "assistant", text);
-          logUsage(id, (ev as any).message);
-            } else if (ev.type === "tool_execution_end") {
-              appendMessage(id, "tool", `${(ev as any).toolName} ${(ev as any).isError ? "✗" : "✓"}`, { toolName: (ev as any).toolName, isError: (ev as any).isError });
-            }
             send(ev);
           }
 
           // 订阅新事件（onEvent 是异步的，先注册回调）
           let unsub: (() => void) | null = null;
           provider.onEvent(id, (event) => {
-            if (event.type === "message_end" && (event as any).message?.role === "assistant") {
-              const text = ((event as any).message.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-              if (text) appendMessage(id, "assistant", text);
-          logUsage(id, (event as any).message);
-            } else if (event.type === "tool_execution_end") {
-              appendMessage(id, "tool", `${(event as any).toolName} ${(event as any).isError ? "✗" : "✓"}`, { toolName: (event as any).toolName, isError: (event as any).isError });
-            }
             send(event);
           }).then((fn) => { unsub = fn; });
 
@@ -389,6 +408,24 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const cmd = new Deno.Command("open", { args: [filePath] });
       await cmd.output();
       return json({ ok: true });
+    }
+    // GET /api/pick-dir — 弹出 macOS 原生目录选择对话框，返回选中的绝对路径
+    if (path === "/api/pick-dir" && req.method === "GET") {
+      try {
+        const cmd = new Deno.Command("osascript", {
+          args: ["-e", 'try', '-e', 'set chosenFolder to choose folder with prompt "选择工作空间文件夹"', '-e', 'return POSIX path of chosenFolder', '-e', 'on error number -128', '-e', 'return ""', '-e', 'end try'],
+          stdout: "piped",
+          stderr: "piped",
+        });
+        const { stdout } = await cmd.output();
+        const dirPath = new TextDecoder().decode(stdout).trim();
+        if (!dirPath) return json({ cancelled: true });
+        // 从绝对路径推导目录名
+        const dirName = dirPath.replace(/\/$/, "").split("/").pop() || "新空间";
+        return json({ path: dirPath, name: dirName });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { "content-type": "application/json" } });
+      }
     }
     // GET /api/settings — 获取全局设置
     if (path === "/api/settings" && req.method === "GET") {
@@ -908,14 +945,19 @@ if (import.meta.main) {
 
   // ===== BrowserWindow =====
   const _Deno = Deno as any;
-  const win: any = new _Deno.BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 640,
-    title: "Pi-a",
-    url: serveUrl,
-  });
+  let win: any = null;
+  if (_Deno.BrowserWindow) {
+    win = new _Deno.BrowserWindow({
+      width: 1280,
+      height: 820,
+      minWidth: 960,
+      minHeight: 640,
+      title: "Pi-a",
+      url: serveUrl,
+    });
+  } else {
+    console.log("[main] 未检测到 Deno Desktop 运行时，跳过窗口创建。");
+  }
 
   // 监听窗口事件：最小化后从 Dock 点击恢复
   try {
@@ -932,42 +974,48 @@ if (import.meta.main) {
 
   // 兜底：监听 BrowserWindow 自身的事件
   try {
-    win.addEventListener("reopen", () => {
-      try { win.show(); win.focus(); } catch {}
-    });
+    if (win) {
+      win.addEventListener("reopen", () => {
+        try { win.show(); win.focus(); } catch {}
+      });
+    }
   } catch {}
 
   // ===== 托盘常驻 =====
   // 关闭窗口时隐藏到托盘而非退出；点托盘图标恢复
   let tray: any = null;
-  try {
-    tray = new _Deno.Tray({ tooltip: "Pi-a · 本地优先 AI 助手" });
-    tray.addEventListener("click", () => {
-      try {
-        if (win.isVisible()) { win.hide(); } else { win.show(); win.focus(); }
-      } catch {}
-    });
-    // 托盘菜单
-    tray.setMenu([
-      { label: "显示 Pi-a", click: () => { try { win.show(); win.focus(); } catch {} } },
-      { label: "新建对话", click: () => { try { win.show(); win.focus(); } catch {} } },
-      { type: "separator" },
-      { label: "退出 Pi-a", click: () => { try { Deno.exit(0); } catch {} } },
-    ]);
-    console.log("[main] 托盘已创建");
-  } catch (e) {
-    console.warn("[main] 托盘不可用:", e);
+  if (_Deno.Tray) {
+    try {
+      tray = new _Deno.Tray({ tooltip: "Pi-a · 本地优先 AI 助手" });
+      tray.addEventListener("click", () => {
+        try {
+          if (win && win.isVisible()) { win.hide(); } else if (win) { win.show(); win.focus(); }
+        } catch {}
+      });
+      // 托盘菜单
+      tray.setMenu([
+        { label: "显示 Pi-a", click: () => { try { if (win) { win.show(); win.focus(); } } catch {} } },
+        { label: "新建对话", click: () => { try { if (win) { win.show(); win.focus(); } } catch {} } },
+        { type: "separator" },
+        { label: "退出 Pi-a", click: () => { try { Deno.exit(0); } catch {} } },
+      ]);
+      console.log("[main] 托盘已创建");
+    } catch (e) {
+      console.warn("[main] 托盘不可用:", e);
+    }
   }
 
   // 窗口关闭按钮 → 最小化到托盘（不退出）
   // deno desktop 的 closeRequested 事件：preventDefault 阻止关闭，hide 隐藏到托盘
   try {
-    win.addEventListener("closeRequested", (e: any) => {
-      try { e.preventDefault(); } catch {}
-      try { win.hide(); } catch {}
-    });
+    if (win) {
+      win.addEventListener("closeRequested", (e: any) => {
+        try { e.preventDefault(); } catch {}
+        try { win.hide(); } catch {}
+      });
+    }
   } catch {}
 
-  console.log("[main] win.windowId =", win.windowId, "serveUrl =", serveUrl);
+  console.log("[main] win.windowId =", win ? win.windowId : "none", "serveUrl =", serveUrl);
   console.log("[main] Pi-a 已就绪，使用 HTTP API（/api/*）通信");
 }

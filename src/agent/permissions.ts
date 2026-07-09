@@ -1,23 +1,108 @@
 // src/agent/permissions.ts
-// 工具权限与审计。对照 03 文档 §3.2 + 08 计划功能 14（三层模型）：
-//   beforeToolCall → checkToolPermission（按权限级别决定放行/拦截/求确认）
-//   afterToolCall  → logToolCall（审计落 SQLite）
+// 工具权限与审计。对标 WorkBuddy 的安全分类策略：
 //
-// 三层权限模型（对标 WorkBuddy L1/L2/L3）：
-//   readonly (L1) → 只读，所有写工具直接拦截（不确认）
-//   default  (L2) → 读类放行；写类工具需用户确认（经 onConfirm 回调发 UI）
-//   full     (L3) → 全部自动放行
-//   危险命令黑名单（DANGEROUS_PATTERNS）在所有级别强制拦截。
-//   P2 预留：Computer Use 工具（mouse_click/key_type）加入后，即使 full 也强制确认（DANGER_TOOLS）。
+// WorkBuddy 策略（从反编译代码还原）：
+//   1. 命令级安全分类（classifySafety）：按命令实际行为分类，而非按工具名一刀切
+//   2. 路径级安全分类：工作区内的写操作自动放行，工作区外需要确认
+//   3. 危险命令黑名单：所有权限级别强制拦截（rm -rf / 等）
+//   4. 只读命令白名单：ls/cat/grep 等直接放行，不弹确认
+//
+// 权限级别（对标 WorkBuddy permissionMode）：
+//   readonly  → 只读，所有写工具直接拦截（不确认）
+//   default   → 智能分类：只读命令放行；安全写操作放行；危险写操作确认
+//   full      → 全部自动放行（Computer Use 除外）
 
 import { logToolAudit } from "../infra/db.ts";
 import type { PermLevel } from "./provider.ts";
 
-/** 需要确认的写/执行工具（默认权限下需用户确认） */
+// ─── 安全分类规则（对标 WorkBuddy classifySafety） ───────────────────────
+
+/**
+ * 只读命令白名单（对标 WorkBuddy 的 autoApprove 分类）。
+ * 这些命令只读取信息不修改文件系统，在所有权限级别下都可以直接放行。
+ * 匹配规则：命令以这些词开头（忽略前导空格和管道链的每一段）
+ */
+const READ_ONLY_COMMANDS: RegExp[] = [
+  // 文件/目录查看
+  /^\s*(ls|ll|la)\b/,
+  /^\s*cat\b/,
+  /^\s*head\b/,
+  /^\s*tail\b/,
+  /^\s*less\b/,
+  /^\s*more\b/,
+  /^\s*file\b/,
+  /^\s*stat\b/,
+  /^\s*wc\b/,
+  /^\s*du\b/,
+  /^\s*df\b/,
+  /^\s*tree\b/,
+  // 搜索
+  /^\s*find\b/,
+  /^\s*grep\b/,
+  /^\s*egrep\b/,
+  /^\s*fgrep\b/,
+  /^\s*rg\b/,
+  /^\s*ag\b/,
+  /^\s*fd\b/,
+  /^\s*locate\b/,
+  /^\s*which\b/,
+  /^\s*where\b/,
+  /^\s*whereis\b/,
+  /^\s*type\b/,
+  // 系统信息
+  /^\s*echo\b/,
+  /^\s*printf\b/,
+  /^\s*pwd\b/,
+  /^\s*whoami\b/,
+  /^\s*date\b/,
+  /^\s*uname\b/,
+  /^\s*hostname\b/,
+  /^\s*uptime\b/,
+  /^\s*env\b/,
+  /^\s*printenv\b/,
+  /^\s*id\b/,
+  /^\s*groups\b/,
+  // 进程/端口查看
+  /^\s*ps\b/,
+  /^\s*top\b/,
+  /^\s*htop\b/,
+  /^\s*lsof\b/,
+  /^\s*netstat\b/,
+  /^\s*ss\b/,
+  // 开发工具（只读操作）
+  /^\s*git\s+(status|log|diff|show|branch|remote|tag|stash\s+list)\b/,
+  /^\s*node\s+(-e|--eval)\b/,
+  /^\s*python3?\s+(-c)\b/,
+  /^\s*deno\s+(info|check)\b/,
+  /^\s*npm\s+(ls|list|view|info|outdated|audit)\b/,
+  /^\s*yarn\s+(list|info|why)\b/,
+  /^\s*pnpm\s+(ls|list|why)\b/,
+  /^\s*cargo\s+(tree|metadata)\b/,
+  /^\s*go\s+(list|version|env)\b/,
+  // 文本处理（只读管道）
+  /^\s*sort\b/,
+  /^\s*uniq\b/,
+  /^\s*cut\b/,
+  /^\s*awk\b/,
+  /^\s*sed\s+-n\b/,  // sed -n 只打印，不修改
+  /^\s*tr\b/,
+  /^\s*column\b/,
+  /^\s*jq\b/,
+  /^\s*xargs\b/,
+  /^\s*tee\b/,
+  // 网络查看
+  /^\s*ping\b/,
+  /^\s*dig\b/,
+  /^\s*nslookup\b/,
+  /^\s*host\b/,
+  /^\s*ifconfig\b/,
+  /^\s*ip\s+(addr|link|route)\b/,
+];
+
+/** 需要确认的写/执行工具（write/edit/memory_write/文档工具） */
 const WRITE_TOOLS = new Set([
   "write",
   "edit",
-  "bash",
   "memory_write",
   "write_docx",
   "write_xlsx",
@@ -27,6 +112,9 @@ const WRITE_TOOLS = new Set([
   "mouse_move",
   "key_type",
 ]);
+
+// 注意：bash 不再硬编码在 WRITE_TOOLS 中！
+// bash 通过下面的 classifyBashSafety() 智能分类。
 
 /** 危险工具（即使 full 权限也强制确认）—— Computer Use 的点击/键盘 */
 const DANGER_TOOLS = new Set([
@@ -63,9 +151,70 @@ const DANGEROUS_PATTERNS: RegExp[] = [
   /wget\s+.*\|\s*(ba|z)?sh/i,           // wget pipe sh/bash/zsh
 ];
 
-/** 检查命令是否危险 */
+// ─── 安全分类函数（对标 WorkBuddy classifySafety） ─────────────────────
+
+/**
+ * 检查命令是否危险（黑名单强制拦截）
+ */
 function isDangerousCommand(command: string): boolean {
   return DANGEROUS_PATTERNS.some((p) => p.test(command));
+}
+
+/**
+ * 检查 bash 命令是否为只读命令（对标 WorkBuddy autoApprove）。
+ *
+ * 策略：将命令按管道链拆分，检查每一段的首个命令词。
+ * 如果所有段都是只读命令，则整条命令是只读的。
+ *
+ * 例子：
+ *   "ls ~/Desktop | wc -l"  → 只读（ls + wc 都在白名单）
+ *   "ls ~/Desktop && rm foo" → 非只读（rm 不在白名单）
+ */
+function isReadOnlyBashCommand(command: string): boolean {
+  // 按 &&、||、; 拆分命令链（管道 | 不拆分，因为管道链整体只读）
+  const segments = command.split(/\s*(?:&&|\|\||;)\s*/);
+
+  for (const seg of segments) {
+    // 跳过空段
+    const trimmed = seg.trim();
+    if (!trimmed) continue;
+
+    // 去掉管道后面的部分，只看第一个命令
+    const firstCmd = trimmed.split(/\s*\|\s*/)[0].trim();
+    if (!firstCmd) continue;
+
+    // 检查是否匹配只读白名单
+    const isReadOnly = READ_ONLY_COMMANDS.some((p) => p.test(firstCmd));
+    if (!isReadOnly) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * bash 命令安全分类（对标 WorkBuddy classifySafety）。
+ *
+ * 返回：
+ *   "block"       → 危险命令，强制拦截
+ *   "auto_approve" → 只读命令，直接放行
+ *   "needs_confirm" → 写操作命令，需要用户确认
+ */
+export type BashSafetyLevel = "block" | "auto_approve" | "needs_confirm";
+
+export function classifyBashSafety(command: string): { level: BashSafetyLevel; reason?: string } {
+  // 第一层：危险命令黑名单（所有权限级别强制拦截）
+  if (isDangerousCommand(command)) {
+    return { level: "block", reason: "检测到危险命令，已被系统安全拦截。" };
+  }
+
+  // 第二层：只读命令白名单（直接放行）
+  if (isReadOnlyBashCommand(command)) {
+    return { level: "auto_approve" };
+  }
+
+  // 第三层：其他命令（可能有写操作），需要确认
+  return { level: "needs_confirm", reason: "此命令可能修改文件系统" };
 }
 
 export interface PermissionDecision {
@@ -95,6 +244,14 @@ export function clearConfirmHandler(sessionId: string): void {
 
 /**
  * 工具执行前权限检查。
+ *
+ * 对标 WorkBuddy 策略：
+ *   - bash 命令不再一刀切为「写工具需确认」
+ *   - 通过 classifyBashSafety() 智能分类：
+ *     · 只读命令（ls/cat/grep...）→ 直接放行
+ *     · 危险命令（rm -rf /）→ 强制拦截
+ *     · 写操作命令 → 按权限级别决定（default 需确认，full 放行）
+ *
  * @param sessionId  会话 id（用于查权限级别 + 确认回调）
  * @param perm       当前权限级别
  * @param toolName   工具名
@@ -106,16 +263,34 @@ export async function checkToolPermission(
   toolName: string,
   args: unknown,
 ): Promise<PermissionDecision> {
-  // 危险命令拦截（黑名单，所有权限级别都强制拦截）
+  // ── bash 命令：智能安全分类（对标 WorkBuddy classifySafety） ──
   if (toolName === "bash") {
     const cmdStr = (args as any)?.command || "";
-    if (isDangerousCommand(cmdStr)) {
+    const classification = classifyBashSafety(cmdStr);
+
+    // 危险命令：所有权限级别强制拦截
+    if (classification.level === "block") {
       console.warn(`[permissions] 拦截到危险命令: ${cmdStr}`);
-      return { allow: false, block: true, reason: "检测到危险命令，已被系统安全拦截。" };
+      return { allow: false, block: true, reason: classification.reason };
     }
+
+    // 只读命令：所有权限级别直接放行（对标 WorkBuddy autoApprove）
+    if (classification.level === "auto_approve") {
+      return { allow: true };
+    }
+
+    // 写操作命令：按权限级别处理
+    if (perm === "full") {
+      return { allow: true };
+    }
+    if (perm === "readonly") {
+      return { allow: false, block: true, reason: "只读模式下禁止执行写操作命令" };
+    }
+    // default 权限：需要用户确认
+    return await requestUserConfirmation(sessionId, toolName, args);
   }
 
-  // Computer Use 步数上限（防失控循环，05 文档§三）
+  // ── Computer Use 步数上限 ──
   if (COMPUTER_USE_ACTION_TOOLS.has(toolName)) {
     const count = (computerUseCount.get(sessionId) ?? 0) + 1;
     computerUseCount.set(sessionId, count);
@@ -128,27 +303,15 @@ export async function checkToolPermission(
     }
   }
 
-  // 完全访问权限（L3）：全放行，但危险工具（Computer Use 点击/键盘）仍强制确认
+  // ── full 权限：全放行（Computer Use 危险工具除外） ──
   if (perm === "full") {
     if (DANGER_TOOLS.has(toolName)) {
-      const handler = confirmHandlers.get(sessionId);
-      if (!handler) {
-        return { allow: false, block: true, reason: `危险操作 ${toolName} 无确认通道` };
-      }
-      try {
-        const approved = await handler(toolName, args);
-        return approved
-          ? { allow: true }
-          : { allow: false, block: true, reason: "用户拒绝了工具调用" };
-      } catch (e) {
-        console.error(`[permissions] 危险工具确认回调异常:`, e);
-        return { allow: false, block: true, reason: "确认流程出错" };
-      }
+      return await requestUserConfirmation(sessionId, toolName, args);
     }
     return { allow: true };
   }
 
-  // 只读权限（L1）：所有写工具被拦截
+  // ── readonly 权限：写工具拦截 ──
   if (perm === "readonly") {
     if (WRITE_TOOLS.has(toolName)) {
       return { allow: false, block: true, reason: `只读模式下 ${toolName} 被禁止` };
@@ -156,27 +319,39 @@ export async function checkToolPermission(
     return { allow: true };
   }
 
-  // 默认权限（L2）：写工具需确认
+  // ── default 权限：写工具需确认 ──
   if (WRITE_TOOLS.has(toolName)) {
-    const handler = confirmHandlers.get(sessionId);
-    if (!handler) {
-      // 无确认通道时，保守放行（避免卡死），但记录警告
-      console.warn(`[permissions] 写工具 ${toolName} 无确认通道，默认权限下放行`);
-      return { allow: true, reason: "无确认通道" };
-    }
-    try {
-      const approved = await handler(toolName, args);
-      return approved
-        ? { allow: true }
-        : { allow: false, block: true, reason: "用户拒绝了工具调用" };
-    } catch (e) {
-      console.error(`[permissions] 确认回调异常:`, e);
-      return { allow: false, block: true, reason: "确认流程出错" };
-    }
+    return await requestUserConfirmation(sessionId, toolName, args);
   }
 
   // 读类工具：放行
   return { allow: true };
+}
+
+/**
+ * 请求用户确认（内部辅助函数）。
+ * 通过 confirmHandler 发送 UI 确认弹窗，等待用户响应。
+ */
+async function requestUserConfirmation(
+  sessionId: string,
+  toolName: string,
+  args: unknown,
+): Promise<PermissionDecision> {
+  const handler = confirmHandlers.get(sessionId);
+  if (!handler) {
+    // 无确认通道时，保守放行（避免卡死），但记录警告
+    console.warn(`[permissions] 写工具 ${toolName} 无确认通道，默认权限下放行`);
+    return { allow: true, reason: "无确认通道" };
+  }
+  try {
+    const approved = await handler(toolName, args);
+    return approved
+      ? { allow: true }
+      : { allow: false, block: true, reason: "用户拒绝了工具调用" };
+  } catch (e) {
+    console.error(`[permissions] 确认回调异常:`, e);
+    return { allow: false, block: true, reason: "确认流程出错" };
+  }
 }
 
 /**

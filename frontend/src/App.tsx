@@ -5,6 +5,7 @@ import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import Composer from "./components/Composer";
 import WorkspaceModal from "./components/WorkspaceModal";
+import ToolConfirmDialog from "./components/ToolConfirmDialog";
 
 export default function App() {
   const { sidebarCollapsed, loadWorkspaces, loadConversations } = useStore();
@@ -24,6 +25,7 @@ export default function App() {
         <Composer />
       </div>
       <WorkspaceModal />
+      <ToolConfirmDialog />
     </div>
   );
 }
