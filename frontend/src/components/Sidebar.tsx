@@ -10,6 +10,15 @@ const CATEGORIES = [
   { id: "automation", label: "自动化", icon: Cog, color: "var(--cat-u)" },
 ];
 
+const STATUS_COLORS: Record<string, string> = {
+  idle: "var(--text-4)",
+  running: "#3b82f6",
+  done: "var(--green)",
+  failed: "var(--red)",
+  pending: "var(--text-3)",
+  planning: "var(--amber)",
+};
+
 function timeAgo(ts: number): string {
   const d = Date.now() - ts;
   const m = Math.floor(d / 60000);
@@ -83,14 +92,17 @@ export default function Sidebar() {
         />
       </div>
 
-      {/* 会话列表 */}
+      {/* 任务列表 */}
+      <div className="sidebar-section-label">任务</div>
       <div className="sidebar-conv-list">
         {conversations.length === 0 && (
-          <div className="sidebar-conv-empty">暂无对话，点击 + 新建</div>
+          <div className="sidebar-conv-empty">暂无任务，点击上方新建</div>
         )}
         {conversations.map((c) => {
           const active = c.id === currentConvId;
           const isHover = hoverConv === c.id;
+          const statusColor = STATUS_COLORS[c.status] || "var(--text-4)";
+          const showStatusDot = c.status && c.status !== "idle";
           return (
             <div
               key={c.id}
@@ -100,7 +112,16 @@ export default function Sidebar() {
               onMouseLeave={() => setHoverConv(null)}
             >
               <div className="sidebar-conv-main">
-                <div className="sidebar-conv-title">{c.title || "新对话"}</div>
+                <div className="sidebar-conv-title">
+                  {showStatusDot && (
+                    <span
+                      className={`sidebar-conv-status ${c.status === "running" ? "pulsing" : ""}`}
+                      style={{ background: statusColor }}
+                      title={c.status}
+                    />
+                  )}
+                  {c.title || "新任务"}
+                </div>
                 <div className="sidebar-conv-time">{timeAgo(c.updatedAt)}</div>
               </div>
               {(isHover || active) && (
