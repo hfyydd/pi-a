@@ -1,0 +1,95 @@
+/* ChatArea 组件样式（照 WorkBuddy 模式） */
+
+.chatMessageContainer { display: flex; gap: 12px; }
+
+/* 用户消息 */
+.userMessageWrapper { max-width: 78%; }
+.userMessageBubble {
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--accent-border);
+  padding: 10px 14px; border-radius: 16px; border-bottom-right-radius: 5px;
+  word-break: break-word; font-size: 14px; line-height: 1.6;
+  white-space: pre-wrap;
+}
+.userMessageBubble p { margin: 0; }
+.userMessageBubble p:last-child { margin-bottom: 0; }
+
+/* 助手消息 */
+.assistantRow { align-items: flex-start; }
+.avatarWrapper { flex-shrink: 0; }
+.assistantAvatar {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--brand-gradient); color: #fff;
+  font-weight: 650; font-size: 12px;
+  display: flex; align-items: center; justifyContent: center;
+  box-shadow: var(--brand-shadow);
+}
+.assistantMessage { min-width: 0; max-width: calc(100% - 40px); flex: 1; }
+.assistantMessageContent { color: var(--text); }
+.streamingMessage { }
+
+/* 助手文本内容 */
+.assistantTextContent { font-size: 15px; line-height: 1.72; word-break: break-word; }
+.assistantTextContent > *:first-child { margin-top: 0; }
+.assistantTextContent p { margin: 0 0 11px; }
+.assistantTextContent p:last-child { margin-bottom: 0; }
+
+/* Markdown 渲染 */
+.cb-markdown { font-size: 15px; line-height: 1.72; word-break: break-word; }
+.cb-markdown h1, .cb-markdown h2, .cb-markdown h3 { font-size: 16px; font-weight: 660; margin: 18px 0 8px; }
+.cb-markdown ul, .cb-markdown ol { margin: 0 0 11px; padding-left: 20px; }
+.cb-markdown li { margin: 2px 0; }
+.cb-markdown code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-subtle); border: 1px solid var(--border-soft); padding: 1px 6px; border-radius: 5px; }
+.cb-markdown pre { background: var(--code-bg); color: var(--code-text); padding: 13px 15px; border-radius: 11px; overflow-x: auto; margin: 0 0 11px; font-size: 12.5px; line-height: 1.6; }
+.cb-markdown pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+.cb-markdown a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-border); }
+.cb-markdown strong { font-weight: 650; }
+.cb-markdown blockquote { border-left: 3px solid var(--border-strong); padding-left: 11px; color: var(--text-2); margin: 0 0 11px; }
+.cb-markdown table { border-collapse: collapse; width: 100%; margin: 0 0 11px; }
+.cb-markdown th, .cb-markdown td { border: 1px solid var(--border-strong); padding: 6px 10px; text-align: left; font-size: 13px; }
+.cb-markdown th { background: var(--bg-subtle); font-weight: 600; }
+
+/* 流式光标 */
+.streaming-cursor {
+  display: inline-block; width: 7px; height: 15px; vertical-align: text-bottom;
+  background: var(--accent); border-radius: 1px; margin-left: 2px;
+  animation: caret 1s steps(2) infinite;
+}
+
+/* 加载动画 */
+.loadingDots { display: flex; align-items: center; gap: 4px; padding: 4px 0; }
+.loadingDots .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--text-3);
+  animation: thinkpulse 1.2s ease-in-out infinite;
+}
+.loadingDots .dot:nth-child(2) { animation-delay: .2s; }
+.loadingDots .dot:nth-child(3) { animation-delay: .4s; }
+
+/* 工具卡片（照 WorkBuddy ToolCard） */
+.tool-card-container { margin: 4px 0; }
+.tool-card { border-radius: 11px; overflow: hidden; transition: all .2s; }
+.tool-card.success { background: var(--green-soft); border: 1px solid var(--green-border); }
+.tool-card.error { background: var(--red-soft); border: 1px solid var(--red-border); }
+.tool-card.pending { background: var(--blue-soft); border: 1px solid var(--blue-border); }
+.tool-inner { padding: 6px 10px; }
+.card-header { }
+.card-header-top { display: flex; align-items: center; justify-content: space-between; }
+.card-header-top .left { display: flex; align-items: center; gap: 7px; font-size: 12px; font-family: var(--mono); }
+.tool-icon { font-size: 14px; }
+.tool-name { font-weight: 600; }
+.card-header-top .right { display: flex; align-items: center; gap: 6px; }
+.tool-status { font-size: 11px; font-weight: 550; }
+.tool-status.success { color: var(--green-text); }
+.tool-status.error { color: var(--red-text); }
+.tool-status.pending { color: var(--blue-text); }
+.tool-chevron { transition: transform .2s; }
+.tool-chevron.expanded { transform: rotate(180deg); }
+.card-content { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+.tool-section { margin-bottom: 8px; }
+.tool-section-title { font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; margin-bottom: 4px; letter-spacing: .04em; }
+.tool-detail {
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-2);
+  background: var(--bg-subtle); border: 1px solid var(--border-soft);
+  padding: 8px 10px; border-radius: 6px; overflow-x: auto; max-height: 160px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
+}

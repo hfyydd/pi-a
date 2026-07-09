@@ -925,10 +925,11 @@ if (import.meta.main) {
   }
 
   // 窗口关闭按钮 → 最小化到托盘（不退出）
+  // deno desktop 的 closeRequested 事件：preventDefault 阻止关闭，hide 隐藏到托盘
   try {
     win.addEventListener("closeRequested", (e: any) => {
-      e.preventDefault?.();
-      win.hide();
+      try { e.preventDefault(); } catch {}
+      try { win.hide(); } catch {}
     });
   } catch {}
 

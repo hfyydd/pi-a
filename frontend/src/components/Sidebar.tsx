@@ -28,7 +28,7 @@ export default function Sidebar() {
       width: 248, flexShrink: 0, background: "var(--bg-sidebar)",
       borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column",
     }}>
-      {/* 顶部行：折叠 + 品牌 + 新建 */}
+      {/* 顶部行：折叠 + 品牌 */}
       <div style={{ height: 40, flexShrink: 0, display: "flex", alignItems: "center", gap: 4, padding: "0 8px" }}>
         <button onClick={toggleSidebar} title="收起侧边栏"
           style={{ width: 28, height: 28, border: "none", background: "transparent", borderRadius: 6, color: "var(--text-3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -44,9 +44,21 @@ export default function Sidebar() {
           }}>π</div>
           <span style={{ fontWeight: 620, fontSize: "13.5px" }}>Pi-a</span>
         </div>
-        <button onClick={() => createConversation()} title="新建对话 (⌘N)"
-          style={{ width: 28, height: 28, border: "none", background: "transparent", borderRadius: 6, color: "var(--text-3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </div>
+
+      {/* 新任务按钮 */}
+      <div style={{ padding: "4px 10px 6px" }}>
+        <button onClick={() => createConversation()}
+          style={{
+            width: "100%", padding: "9px 12px", display: "flex", alignItems: "center", gap: 9,
+            background: "var(--bg)", border: "1px solid var(--border-strong)", borderRadius: 11,
+            color: "var(--text)", fontSize: "13.5px", fontWeight: 550,
+            boxShadow: "var(--shadow-sm)", transition: "all .14s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.background = "var(--accent-soft)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; e.currentTarget.style.color = "var(--text)"; e.currentTarget.style.background = "var(--bg)"; }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <span>新建任务</span>
         </button>
       </div>
 
