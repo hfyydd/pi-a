@@ -4,7 +4,7 @@ import "./ChatArea.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getRandomTip } from "../utils/loadingTips";
-import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2 } from "lucide-react";
+import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2, Copy, ThumbsUp, ThumbsDown, Volume2, Share2 } from "lucide-react";
 
 
 /** 工具卡片组件（对标 WorkBuddy：内联折叠式，支持点击展开查看详情） */
@@ -148,10 +148,59 @@ function ThinkingBubble() {
   );
 }
 
+function formatTime(timestamp?: number): string {
+  if (!timestamp) return "";
+  const d = new Date(timestamp);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
 export default function ChatArea() {
   const { messages, busy, currentConvId, sidebarCollapsed, toggleSidebar, conversations } = useStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+
+  // 功能按钮状态记录
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<Record<string, "up" | "down">>({});
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+
+  // 复制文字
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // 点赞/踩评
+  const handleRate = (id: string, type: "up" | "down") => {
+    setRatings((prev) => ({
+      ...prev,
+      [id]: prev[id] === type ? undefined : type,
+    }) as any);
+  };
+
+  // 语音朗读 (HTML5 SpeechSynthesis)
+  const handleSpeak = (id: string, text: string) => {
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+    } else {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => setSpeakingId(null);
+      utterance.onerror = () => setSpeakingId(null);
+      window.speechSynthesis.speak(utterance);
+      setSpeakingId(id);
+    }
+  };
+
+  // 分享功能
+  const handleShare = (text: string) => {
+    navigator.clipboard.writeText(text);
+    // 可选：静默提示或自定义反馈。这里复制文字后可以直接提示已复制
+  };
 
   // 自动滚动（照 WorkBuddy useMessageScroll 模式）
   useEffect(() => {
@@ -204,11 +253,17 @@ export default function ChatArea() {
           {messages.map((msg) => {
             if (msg.role === "user") {
               return (
-                <div key={msg.id} className="chatMessageContainer" style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div key={msg.id} className="chatMessageContainer userRow" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                   <div className="userMessageWrapper">
                     <div className="userMessageBubble">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
+                  </div>
+                  <div className="message-action-row user-actions">
+                    <button className="action-btn" onClick={() => handleCopy(msg.id, msg.content)} title="复制内容">
+                      {copiedId === msg.id ? <Check size={12} className="copied" /> : <Copy size={12} />}
+                    </button>
+                    {msg.createdAt && <span className="message-time">{formatTime(msg.createdAt)}</span>}
                   </div>
                 </div>
               );
@@ -224,6 +279,29 @@ export default function ChatArea() {
                     <div className="assistantMessageContent">
                       <AssistantContent content={msg.content} streaming={isStreaming} />
                     </div>
+                    {!isStreaming && (
+                      <div className="message-action-row assistant-actions">
+                        <button className="action-btn" onClick={() => handleCopy(msg.id, msg.content)} title="复制内容">
+                          {copiedId === msg.id ? <Check size={12} className="copied" /> : <Copy size={12} />}
+                        </button>
+                        <button className={`action-btn ${ratings[msg.id] === "up" ? "active-like" : ""}`} onClick={() => handleRate(msg.id, "up")} title="赞同">
+                          <ThumbsUp size={12} />
+                        </button>
+                        <button className={`action-btn ${ratings[msg.id] === "down" ? "active-dislike" : ""}`} onClick={() => handleRate(msg.id, "down")} title="反对">
+                          <ThumbsDown size={12} />
+                        </button>
+                        <button className={`action-btn ${speakingId === msg.id ? "active-speak" : ""}`} onClick={() => handleSpeak(msg.id, msg.content)} title={speakingId === msg.id ? "停止朗读" : "语音朗读"}>
+                          <Volume2 size={12} />
+                        </button>
+                        <button className="action-btn" onClick={() => handleShare(msg.content)} title="复制链接分享">
+                          <Share2 size={12} />
+                        </button>
+                        <button className="action-btn" title="更多选项">
+                          <MoreHorizontal size={12} />
+                        </button>
+                        {msg.createdAt && <span className="message-time">{formatTime(msg.createdAt)}</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

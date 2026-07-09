@@ -233,3 +233,87 @@
 }
 .welcome-subtab:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border); }
 .welcome-subtab-icon { flex-shrink: 0; }
+
+/* 消息功能按钮操作条 (复制、评分、朗读、分享) */
+.message-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* 悬浮或聚焦才显示按钮，触底对齐 */
+.chatMessageContainer:hover .message-action-row {
+  opacity: 1;
+}
+
+.assistantMessage:hover .message-action-row {
+  opacity: 1;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-3, #8a8a9a);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.action-btn:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-1, #e0e0e0);
+}
+
+.action-btn svg {
+  flex-shrink: 0;
+}
+
+/* 特殊动作按钮激活态样式 */
+.action-btn .copied {
+  color: #22c55e;
+}
+
+.action-btn.active-like {
+  color: #3b82f6; /* 亮蓝色 */
+}
+
+.action-btn.active-dislike {
+  color: #ef4444; /* 红色 */
+}
+
+.action-btn.active-speak {
+  color: #a855f7; /* 紫色 */
+  animation: speak-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes speak-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.message-time {
+  font-size: 11px;
+  color: var(--text-3, #6a6a7a);
+  margin-left: 6px;
+}
+
+/* 用户与助手操作条位置微调 */
+.message-action-row.user-actions {
+  margin-right: 4px;
+}
+
+.message-action-row.assistant-actions {
+  margin-top: 8px;
+  padding-left: 2px;
+}
