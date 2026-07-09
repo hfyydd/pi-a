@@ -62,6 +62,17 @@
   background: var(--bg-active); color: var(--text);
   font-weight: 550;
 }
+.sidebar-nav-item.disabled {
+  opacity: .55; cursor: not-allowed;
+}
+.sidebar-nav-item.disabled:hover {
+  background: transparent; color: var(--text-2);
+}
+.sidebar-nav-badge {
+  margin-left: auto; font-size: 9.5px; font-weight: 500;
+  padding: 1px 6px; border-radius: 999px;
+  background: var(--bg-subtle); color: var(--text-3);
+}
 .sidebar-nav-icon {
   width: 18px; height: 18px;
   display: flex; align-items: center; justify-content: center;

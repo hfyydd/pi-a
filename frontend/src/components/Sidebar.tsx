@@ -4,10 +4,10 @@ import { Search, Plus, Settings, PanelLeft, Sun, Moon, MessageSquare, FolderKanb
 import "./Sidebar.css";
 
 const CATEGORIES = [
-  { id: "assistant", label: "助理", icon: MessageSquare, color: "var(--cat-a)" },
-  { id: "project", label: "项目", icon: FolderKanban, color: "var(--cat-p)" },
-  { id: "expert", label: "专家", icon: Star, color: "var(--cat-c)" },
-  { id: "automation", label: "自动化", icon: Cog, color: "var(--cat-u)" },
+  { id: "assistant", label: "助理", icon: MessageSquare, color: "var(--cat-a)", enabled: false },
+  { id: "project", label: "项目", icon: FolderKanban, color: "var(--cat-p)", enabled: false },
+  { id: "expert", label: "专家", icon: Star, color: "var(--cat-c)", enabled: false },
+  { id: "automation", label: "自动化", icon: Cog, color: "var(--cat-u)", enabled: false },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -63,6 +63,21 @@ export default function Sidebar() {
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const active = activeCategory === cat.id;
+          if (!cat.enabled) {
+            return (
+              <button
+                key={cat.id}
+                className="sidebar-nav-item disabled"
+                onClick={() => alert(`${cat.label}功能开发中，敬请期待`)}
+              >
+                <span className="sidebar-nav-icon" style={{ color: "var(--text-4)" }}>
+                  <Icon size={17} />
+                </span>
+                <span className="sidebar-nav-label">{cat.label}</span>
+                <span className="sidebar-nav-badge">即将上线</span>
+              </button>
+            );
+          }
           return (
             <button
               key={cat.id}

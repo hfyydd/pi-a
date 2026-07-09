@@ -81,16 +81,16 @@ export const useStore = create<AppState>((set, get) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   setCategory: (cat) => {
-    set({ activeCategory: cat, currentConvId: null, messages: [] });
-    get().loadConversations();
+    set({ activeCategory: cat });
+    // 四个分类都是独立功能模块，暂未开发
   },
 
   loadConversations: async () => {
     try {
       const params = new URLSearchParams();
       const s = get();
-      params.set("category", s.activeCategory);
       if (s.searchQuery) params.set("search", s.searchQuery);
+      // 不按 category 筛选——任务列表显示所有对话
       const list = await apiGet<Conversation[]>("/api/conv?" + params.toString());
       set({ conversations: list });
       if (list.length > 0 && !get().currentConvId) {
@@ -123,8 +123,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   createConversation: async (title = "新对话") => {
-    const s = get();
-    const conv = await apiPost<Conversation>("/api/conv", { title, category: s.activeCategory });
+    const conv = await apiPost<Conversation>("/api/conv", { title });
     await get().loadConversations();
     get().selectConversation(conv.id);
     return conv.id;
