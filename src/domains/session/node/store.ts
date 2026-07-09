@@ -10,6 +10,7 @@ export interface Conversation {
   status: string;   // idle | running | done | failed | pending | planning
   modelProvider: string;
   modelId: string;
+  workspaceId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -31,11 +32,11 @@ function uuid(): string {
 }
 
 /** 新建会话 */
-export function createConversation(title = "新对话", category = "assistant"): Conversation {
+export function createConversation(title = "新对话", category = "assistant", workspaceId?: string | null): Conversation {
   const db = getDb();
   const id = uuid();
   const now = Date.now();
-  
+
   // 查询全局默认模型设置
   let provider = "deepseek";
   let modelId = "deepseek-v4-flash";
@@ -47,22 +48,23 @@ export function createConversation(title = "新对话", category = "assistant"):
   } catch { /* 表不存在或未初始化 */ }
 
   db.prepare(
-    "INSERT INTO conversations (id, title, category, status, model_provider, model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-  ).run(id, title, category, "idle", provider, modelId, now, now);
-  return { id, title, category, status: "idle", modelProvider: provider, modelId: modelId, createdAt: now, updatedAt: now };
+    "INSERT INTO conversations (id, title, category, status, model_provider, model_id, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(id, title, category, "idle", provider, modelId, workspaceId ?? null, now, now);
+  return { id, title, category, status: "idle", modelProvider: provider, modelId: modelId, workspaceId: workspaceId ?? null, createdAt: now, updatedAt: now };
 }
 
-/** 列出会话（可按分类/状态筛选 + 关键词搜索，按更新时间倒序） */
-export function listConversations(category?: string, search?: string, status?: string): Conversation[] {
+/** 列出会话（可按分类/状态/工作空间筛选 + 关键词搜索，按更新时间倒序） */
+export function listConversations(category?: string, search?: string, status?: string, workspaceId?: string | null): Conversation[] {
   const db = getDb();
   const conds: string[] = [];
   const params: unknown[] = [];
   if (category && category !== "all") { conds.push("category = ?"); params.push(category); }
   if (search && search.trim()) { conds.push("LOWER(title) LIKE ?"); params.push(`%${search.trim().toLowerCase()}%`); }
   if (status && status !== "all") { conds.push("status = ?"); params.push(status); }
+  if (workspaceId) { conds.push("workspace_id = ?"); params.push(workspaceId); }
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
   const stmt = db.prepare(
-    `SELECT id, title, category, status, model_provider as modelProvider, model_id as modelId, created_at as createdAt, updated_at as updatedAt FROM conversations ${where} ORDER BY updated_at DESC`,
+    `SELECT id, title, category, status, model_provider as modelProvider, model_id as modelId, workspace_id as workspaceId, created_at as createdAt, updated_at as updatedAt FROM conversations ${where} ORDER BY updated_at DESC`,
   );
   const rows = stmt.all(...(params as any[])) as unknown as Conversation[];
   return rows;
@@ -80,9 +82,11 @@ export function moveConversation(id: string, category: string): void {
   db.prepare("UPDATE conversations SET category = ?, updated_at = ? WHERE id = ?").run(category, Date.now(), id);
 }
 
-/** 删除会话及其消息 */
+/** 删除会话及其关联数据（消息 + 产物），避免外键约束失败 */
 export function deleteConversation(id: string): void {
   const db = getDb();
+  // artifacts 表有 conversation_id 外键（on_delete=NO ACTION），须先清子表
+  db.prepare("DELETE FROM artifacts WHERE conversation_id = ?").run(id);
   db.prepare("DELETE FROM messages WHERE conversation_id = ?").run(id);
   db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
 }

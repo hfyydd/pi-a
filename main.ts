@@ -36,6 +36,7 @@ import {
 } from "./src/domains/session/node/store.ts";
 import { listArtifacts, deleteArtifact } from "./src/domains/artifact/node/store.ts";
 import { createProject, listProjects, getProject, updateProject, deleteProject, assignConversationToProject, listProjectConversations } from "./src/domains/project/node/store.ts";
+import { createWorkspace, listWorkspaces, getWorkspace, updateWorkspace, deleteWorkspace, touchWorkspace, listWorkspaceConversations, assignConversationToWorkspace } from "./src/domains/workspace/node/store.ts";
 import { BUILTIN_EXPERTS, getExpert } from "./src/agent/experts.ts";
 import { getApiKey } from "./src/infra/keychain.ts";
 
@@ -127,19 +128,20 @@ function logUsage(sessionId: string, message: any) {
 export async function handleApi(req: Request, path: string): Promise<Response> {
   const json = (s: unknown) => new Response(JSON.stringify(s), { headers: { "content-type": "application/json" } });
   try {
-    // GET /api/conv?category=&search=
+    // GET /api/conv?category=&search=&workspaceId=
     if (path === "/api/conv" && req.method === "GET") {
       const u = new URL(req.url);
       return json(listConversations(
         u.searchParams.get("category") || undefined,
         u.searchParams.get("search") || undefined,
         u.searchParams.get("status") || undefined,
+        u.searchParams.get("workspaceId") || undefined,
       ));
     }
-    // POST /api/conv  { title, category }
+    // POST /api/conv  { title, category, workspaceId }
     if (path === "/api/conv" && req.method === "POST") {
       const b = await req.json();
-      const conv = createConversation(b.title, b.category);
+      const conv = createConversation(b.title, b.category, b.workspaceId ?? null);
       return json(conv);
     }
     // DELETE /api/conv/:id
@@ -801,6 +803,39 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       assignConversationToProject(b.conversationId, id);
       return json({ ok: true });
     }
+    // ===== 工作空间 API =====
+    if (path === "/api/workspaces" && req.method === "GET") {
+      return json(listWorkspaces());
+    }
+    if (path === "/api/workspaces" && req.method === "POST") {
+      const b = await req.json();
+      return json(createWorkspace(b.name, b));
+    }
+    if (path.startsWith("/api/workspaces/") && !path.includes("/assign") && req.method === "GET") {
+      const id = path.split("/")[3];
+      const ws = getWorkspace(id);
+      if (!ws) return json({ error: "工作空间不存在" });
+      touchWorkspace(id);
+      const convs = listWorkspaceConversations(id);
+      return json({ ...ws, conversations: convs });
+    }
+    if (path.startsWith("/api/workspaces/") && !path.includes("/assign") && req.method === "PUT") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      updateWorkspace(id, b);
+      return json({ ok: true });
+    }
+    if (path.startsWith("/api/workspaces/") && !path.includes("/assign") && req.method === "DELETE") {
+      const id = path.split("/")[3];
+      deleteWorkspace(id);
+      return json({ ok: true });
+    }
+    if (path.includes("/assign") && path.startsWith("/api/workspaces/") && req.method === "POST") {
+      const id = path.split("/")[3];
+      const b = await req.json();
+      assignConversationToWorkspace(b.conversationId, id);
+      return json({ ok: true });
+    }
     // ===== 专家 API =====
     // ===== 用量统计 API =====
     // GET /api/usage — 获取 token 用量汇总（最近7天）
@@ -874,10 +909,10 @@ if (import.meta.main) {
   // ===== BrowserWindow =====
   const _Deno = Deno as any;
   const win: any = new _Deno.BrowserWindow({
-    width: 1080,
-    height: 740,
-    minWidth: 760,
-    minHeight: 480,
+    width: 1280,
+    height: 820,
+    minWidth: 960,
+    minHeight: 640,
     title: "Pi-a",
     url: serveUrl,
   });

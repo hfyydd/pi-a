@@ -3,13 +3,13 @@ import { useStore } from "../store/useStore";
 import "./ChatArea.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2, Wrench } from "lucide-react";
 
 
 /** 工具卡片组件（照 WorkBuddy ToolCard 模式） */
 function ToolCard({ name, status, args, result }: { name: string; status: "running" | "success" | "error"; args?: string; result?: string }) {
   const [expanded, setExpanded] = useState(false);
-  const icon = status === "error" ? "✗" : status === "running" ? "⋯" : "✓";
+  const statusIcon = status === "error" ? <X size={13} /> : status === "running" ? <Loader2 size={13} className="tool-spin" /> : <Check size={13} />;
   const outcomeClass = status === "error" ? "error" : status === "running" ? "pending" : "success";
 
   return (
@@ -19,7 +19,7 @@ function ToolCard({ name, status, args, result }: { name: string; status: "runni
           <div className="card-header">
             <div className="card-header-top">
               <div className="left">
-                <span className="tool-icon">{icon}</span>
+                <span className="tool-icon">{statusIcon}</span>
                 <span className="tool-name">{name}</span>
               </div>
               <div className="right">
@@ -123,13 +123,6 @@ export default function ChatArea() {
         <span style={{ fontSize: "13.5px", fontWeight: 550, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {conv?.title || "新对话"}
         </span>
-        <span style={{
-          display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 9px",
-          border: "1px solid var(--border-strong)", borderRadius: 999, fontSize: "11.5px", fontWeight: 550, color: "var(--text-2)",
-        }}>
-          <span style={{ width: 5, height: 5, borderRadius: "50%", background: busy ? "var(--amber)" : "var(--green)" }} />
-          {conv?.modelId || "deepseek-v4-flash"}
-        </span>
       </header>
 
       {/* 消息流 */}
@@ -168,7 +161,7 @@ export default function ChatArea() {
             return (
               <div key={msg.id} className="chatMessageContainer assistantRow" style={{ alignItems: "center" }}>
                 <div className="avatarWrapper" style={{ opacity: 0.7 }}>
-                  <div className="assistantAvatar">🔧</div>
+                  <div className="assistantAvatar"><Wrench size={14} /></div>
                 </div>
                 <div className="assistantMessage">
                   <ToolCard
@@ -211,35 +204,73 @@ export default function ChatArea() {
   );
 }
 
-/** 欢迎页 */
+/** 欢迎页（对齐 WorkBuddy 初始界面，使用 lucide 图标） */
 function WelcomeScreen() {
+  const [activeTab, setActiveTab] = useState("代码开发");
+
+  const mainTabs = [
+    { key: "日常办公", icon: Briefcase },
+    { key: "代码开发", icon: Code2 },
+    { key: "设计创意", icon: Palette },
+  ];
+
+  const subTabs: Record<string, Array<{ key: string; icon: any }>> = {
+    "代码开发": [
+      { key: "日常开发", icon: FileCode },
+      { key: "网站开发", icon: Globe },
+      { key: "Agent 应用", icon: Bot },
+      { key: "更多", icon: MoreHorizontal },
+    ],
+    "日常办公": [
+      { key: "文档处理", icon: FileText },
+      { key: "数据分析", icon: BarChart3 },
+      { key: "邮件管理", icon: Mail },
+      { key: "更多", icon: MoreHorizontal },
+    ],
+    "设计创意": [
+      { key: "UI 设计", icon: Layout },
+      { key: "图标生成", icon: Shapes },
+      { key: "图片编辑", icon: Image },
+      { key: "更多", icon: MoreHorizontal },
+    ],
+  };
+
   return (
-    <div style={{ textAlign: "center", paddingTop: "10vh" }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: 15, margin: "0 auto 16px",
-        background: "var(--brand-gradient)", color: "#fff", fontWeight: 700, fontSize: 22,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 8px 24px rgba(79,70,229,.3)",
-      }}>π</div>
-      <h2 style={{ fontSize: 24, fontWeight: 650, marginBottom: 7, letterSpacing: "-.02em" }}>有什么可以帮你？</h2>
-      <p style={{ color: "var(--text-3)", fontSize: 14 }}>Pi-a 是本地优先的 AI 桌面助手</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxWidth: 520, margin: "28px auto 0" }}>
-        {[
-          { t: "📊 读取表格并总结", d: "支持 xlsx/csv/docx", q: "读一下 ~/Desktop/sample.xlsx 并总结内容" },
-          { t: "📝 生成周报文档", d: "输出 docx 工件", q: "帮我生成一份本周工作周报 docx" },
-          { t: "🧠 记住我的偏好", d: "写入长期记忆", q: "记住我喜欢简洁的写作风格" },
-          { t: "🎯 生成演示文稿", d: "输出 pptx 工件", q: "做一个产品季度汇报 PPT" },
-        ].map((s, i) => (
-          <div key={i} onClick={() => useStore.getState().sendMessage(s.q)} style={{
-            textAlign: "left", padding: "13px 14px", background: "var(--bg)",
-            border: "1px solid var(--border)", borderRadius: 11, cursor: "pointer", transition: "all .14s",
-          }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--accent-soft)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg)"; }}>
-            <div style={{ fontSize: 13, fontWeight: 550, color: "var(--text)", marginBottom: 2 }}>{s.t}</div>
-            <div style={{ fontSize: "11.5px", color: "var(--text-3)" }}>{s.d}</div>
-          </div>
-        ))}
+    <div className="welcome-screen">
+      {/* 标题区 — 左对齐 */}
+      <div className="welcome-header">
+        <h1 className="welcome-title">Pi-a</h1>
+        <p className="welcome-subtitle">你的本地 AI 超能力</p>
+      </div>
+
+      {/* 主分类 tab */}
+      <div className="welcome-tabs">
+        {mainTabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              className={`welcome-tab ${activeTab === tab.key ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <Icon size={15} className="welcome-tab-icon" strokeWidth={2} />
+              {tab.key}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 子分类（根据主 tab 变化） */}
+      <div className="welcome-subtabs">
+        {(subTabs[activeTab] || []).map((sub) => {
+          const Icon = sub.icon;
+          return (
+            <button key={sub.key} className="welcome-subtab">
+              <Icon size={13} className="welcome-subtab-icon" strokeWidth={2} />
+              {sub.key}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

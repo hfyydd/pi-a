@@ -1,5 +1,8 @@
 /* ChatArea 组件样式（照 WorkBuddy 模式） */
 
+.tool-spin { animation: tool-spin 0.9s linear infinite; }
+@keyframes tool-spin { to { transform: rotate(360deg); } }
+
 .chatMessageContainer { display: flex; gap: 12px; }
 
 /* 用户消息 */
@@ -93,3 +96,53 @@
   padding: 8px 10px; border-radius: 6px; overflow-x: auto; max-height: 160px; overflow-y: auto;
   white-space: pre-wrap; word-break: break-all;
 }
+
+/* ===== 欢迎页（对齐 WorkBuddy 初始界面）===== */
+.welcome-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 36px 40px 8px;
+}
+
+/* 标题 — 左对齐 */
+.welcome-header { text-align: left; margin-bottom: 22px; }
+.welcome-title {
+  font-size: 40px; font-weight: 780; letter-spacing: -0.03em;
+  color: var(--text); margin-bottom: 4px; line-height: 1.15;
+}
+.welcome-subtitle {
+  font-size: 17px; color: var(--text-2); font-weight: 500; margin-top: 2px;
+}
+
+/* 主分类 tab */
+.welcome-tabs {
+  display: flex; gap: 4px; margin-bottom: 10px;
+}
+.welcome-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-2); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.welcome-tab:hover { background: var(--bg-hover); }
+.welcome-tab.active {
+  background: var(--bg-subtle); border-color: var(--accent-border);
+  color: var(--text); font-weight: 600;
+}
+.welcome-tab-icon { flex-shrink: 0; }
+
+/* 子分类 */
+.welcome-subtabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.welcome-subtab {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 13px; border-radius: 999px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-2); font-size: 12px;
+  cursor: pointer; transition: all .15s;
+}
+.welcome-subtab:hover { background: var(--bg-hover); color: var(--text); }
+.welcome-subtab-icon { flex-shrink: 0; }

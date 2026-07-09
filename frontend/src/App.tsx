@@ -4,14 +4,16 @@ import { initTheme } from "./store/appStore";
 import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import Composer from "./components/Composer";
+import WorkspaceModal from "./components/WorkspaceModal";
 
 export default function App() {
-  const { sidebarCollapsed, loadConversations } = useStore();
+  const { sidebarCollapsed, loadWorkspaces, loadConversations } = useStore();
 
   useEffect(() => {
     const t = initTheme();
     useStore.setState({ theme: t });
-    loadConversations();
+    // 先加载工作空间（确定 currentWorkspaceId），再加载该空间下的对话
+    loadWorkspaces().then(() => loadConversations());
   }, []);
 
   return (
@@ -21,6 +23,7 @@ export default function App() {
         <ChatArea />
         <Composer />
       </div>
+      <WorkspaceModal />
     </div>
   );
 }

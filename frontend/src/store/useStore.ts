@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiGet, apiPost, apiDelete } from "../api/client";
+import { apiGet, apiPost, apiPut, apiDelete } from "../api/client";
 
 export type RunMode = "ask" | "plan" | "craft";
 export type PermLevel = "readonly" | "default" | "full";
@@ -12,8 +12,18 @@ export interface Conversation {
   status: string;
   modelProvider: string;
   modelId: string;
+  workspaceId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  dirPath: string;
+  icon: string;
+  lastOpenedAt: number;
+  createdAt: number;
 }
 
 export interface Message {
@@ -33,6 +43,10 @@ interface AppState {
   currentConvId: string | null;
   searchQuery: string;
 
+  // 工作空间
+  workspaces: Workspace[];
+  composerWorkspaceId: string | null;  // Composer 里选的空间，新建会话时绑定
+
   // 对话
   messages: Message[];
   busy: boolean;
@@ -42,9 +56,15 @@ interface AppState {
   // 主题
   theme: Theme;
 
+  // 模型
+  modelId: string;       // 当前选择的模型 ID（如 "Hy3", "deepseek-v4-flash"）
+  modelProvider: string; // 当前模型提供商（如 "zhipu", "deepseek"）
+
   // UI 面板
   showSettings: boolean;
   showArtifacts: boolean;
+  showWorkspaceManager: boolean;
+  _pendingDirPath: { name: string; path: string } | null;  // 「打开本地文件夹」传给 modal 的临时状态
 
   // Actions
   toggleSidebar: () => void;
@@ -60,6 +80,16 @@ interface AppState {
   toggleTheme: () => void;
   setShowSettings: (v: boolean) => void;
   setShowArtifacts: (v: boolean) => void;
+  setShowWorkspaceManager: (v: boolean) => void;
+  setComposerWorkspaceId: (id: string | null) => void;
+
+  // 工作空间
+  loadWorkspaces: () => Promise<void>;
+  selectWorkspace: (id: string) => void;
+  createWorkspace: (name: string, dirPath?: string, icon?: string) => Promise<void>;
+  updateWorkspace: (id: string, patch: { name?: string; dirPath?: string; icon?: string }) => Promise<void>;
+  deleteWorkspace: (id: string) => Promise<void>;
+  assignConversation: (convId: string, workspaceId: string) => Promise<void>;
 }
 
 let sseSource: EventSource | null = null;
@@ -70,13 +100,21 @@ export const useStore = create<AppState>((set, get) => ({
   conversations: [],
   currentConvId: null,
   searchQuery: "",
+  workspaces: [],
+  composerWorkspaceId: null,
   messages: [],
   busy: false,
   mode: "craft",
   permission: "default",
   theme: "light",
+
+  // 模型
+  modelId: "deepseek-v4-flash",
+  modelProvider: "deepseek",
   showSettings: false,
   showArtifacts: false,
+  showWorkspaceManager: false,
+  _pendingDirPath: null,
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
@@ -90,12 +128,10 @@ export const useStore = create<AppState>((set, get) => ({
       const params = new URLSearchParams();
       const s = get();
       if (s.searchQuery) params.set("search", s.searchQuery);
-      // 不按 category 筛选——任务列表显示所有对话
+      // 加载全部会话（侧边栏按「任务」/「空间」分组展示）
       const list = await apiGet<Conversation[]>("/api/conv?" + params.toString());
       set({ conversations: list });
-      if (list.length > 0 && !get().currentConvId) {
-        get().selectConversation(list[0].id);
-      }
+      // 不自动选中——保持初始界面（欢迎屏+工作空间选择器），对齐 WorkBuddy
     } catch {}
   },
 
@@ -123,7 +159,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   createConversation: async (title = "新对话") => {
-    const conv = await apiPost<Conversation>("/api/conv", { title });
+    const wsId = get().composerWorkspaceId;  // Composer 里选的空间
+    const conv = await apiPost<Conversation>("/api/conv", { title, workspaceId: wsId });
+    // 建完即复位：下一次「开始对话」默认不归属任何空间（任务）
+    set({ composerWorkspaceId: null });
     await get().loadConversations();
     get().selectConversation(conv.id);
     return conv.id;
@@ -158,7 +197,7 @@ export const useStore = create<AppState>((set, get) => ({
       });
     } catch (e) {
       set((st) => ({
-        messages: [...st.messages, { id: crypto.randomUUID(), role: "assistant", content: "❌ 出错了：" + (e as Error).message, createdAt: Date.now() }],
+        messages: [...st.messages, { id: crypto.randomUUID(), role: "assistant", content: "出错了：" + (e as Error).message, createdAt: Date.now() }],
         busy: false,
       }));
     }
@@ -183,6 +222,49 @@ export const useStore = create<AppState>((set, get) => ({
 
   setShowSettings: (v) => set({ showSettings: v }),
   setShowArtifacts: (v) => set({ showArtifacts: v }),
+  setShowWorkspaceManager: (v) => set({ showWorkspaceManager: v }),
+  setComposerWorkspaceId: (id) => set({ composerWorkspaceId: id }),
+
+  // ===== 工作空间 =====
+  loadWorkspaces: async () => {
+    try {
+      const list = await apiGet<Workspace[]>("/api/workspaces");
+      // 不自动创建默认空间——空间由用户主动创建
+      set({ workspaces: list });
+    } catch {}
+  },
+
+  selectWorkspace: (id) => {
+    set({ composerWorkspaceId: id });
+  },
+
+  createWorkspace: async (name, dirPath, icon) => {
+    const ws = await apiPost<Workspace>("/api/workspaces", {
+      name,
+      dirPath: dirPath || "",
+      icon: icon || "folder",
+    });
+    await get().loadWorkspaces();
+    set({ composerWorkspaceId: ws.id });
+  },
+
+  updateWorkspace: async (id, patch) => {
+    await apiPut("/api/workspaces/" + id, patch);
+    await get().loadWorkspaces();
+  },
+
+  deleteWorkspace: async (id) => {
+    await apiDelete("/api/workspaces/" + id);
+    // 清除 composer 选择如果删的是当前选的
+    if (get().composerWorkspaceId === id) set({ composerWorkspaceId: null });
+    await get().loadWorkspaces();
+    await get().loadConversations();
+  },
+
+  assignConversation: async (convId, workspaceId) => {
+    await apiPost("/api/workspaces/" + workspaceId + "/assign", { conversationId: convId });
+    await get().loadConversations();
+  },
 }));
 
 // SSE 事件处理
@@ -223,7 +305,7 @@ function handleEvent(ev: any, set: any, get: any) {
   } else if (ev.type === "tool_execution_end") {
     set((st: AppState) => {
       const msgs = st.messages.map((m) =>
-        m.id === ev.toolCallId ? { ...m, content: `${ev.toolName} ${ev.isError ? "✗" : "✓"}`, isError: ev.isError } : m
+        m.id === ev.toolCallId ? { ...m, content: ev.toolName, isError: ev.isError } : m
       );
       return { messages: msgs };
     });

@@ -114,6 +114,15 @@ export function initDb(): DatabaseSync {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      dir_path TEXT NOT NULL DEFAULT '',
+      icon TEXT DEFAULT '📁',
+      last_opened_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS conversation_forks (
       src TEXT NOT NULL,
       dst TEXT NOT NULL,
@@ -185,6 +194,8 @@ export function initDb(): DatabaseSync {
   addColumn("conversations", "project_id", "TEXT");
   // 补 conversations.expert_id 列（专家模式）
   addColumn("conversations", "expert_id", "TEXT");
+  // 补 conversations.workspace_id 列（工作空间）
+  addColumn("conversations", "workspace_id", "TEXT");
   // 补 messages.branch_id 列（会话分叉/消息树）
   addColumn("messages", "branch_id", "TEXT DEFAULT 'main'");
   // 补 messages.parent_id 列（会话分叉：记录消息树形父节点）

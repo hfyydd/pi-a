@@ -1,12 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useStore } from "../store/useStore";
-import { Search, Plus, Settings, PanelLeft, Sun, Moon, MessageSquare, FolderKanban, Star, Cog, Trash2 } from "lucide-react";
+import {
+  Search, Plus, Settings, PanelLeft, Sun, Moon, MessageSquare,
+  FolderKanban, Star, Cog, Trash2, MoreHorizontal, FolderInput,
+  ChevronDown, ChevronRight,
+} from "lucide-react";
 import "./Sidebar.css";
+import { WorkspaceIcon } from "./WorkspaceIcon";
 
 const CATEGORIES = [
   { id: "assistant", label: "助理", icon: MessageSquare, color: "var(--cat-a)", enabled: false },
   { id: "project", label: "项目", icon: FolderKanban, color: "var(--cat-p)", enabled: false },
-  { id: "expert", label: "专家", icon: Star, color: "var(--cat-c)", enabled: false },
+  { id: "expert", label: "专家·技能·连接器", icon: Star, color: "var(--cat-c)", enabled: false },
   { id: "automation", label: "自动化", icon: Cog, color: "var(--cat-u)", enabled: false },
 ];
 
@@ -29,17 +34,168 @@ function timeAgo(ts: number): string {
   return `${Math.floor(d / 86400000)} 天前`;
 }
 
+/* ===== 可折叠 Section（任务 / 空间）===== */
+function CollapsibleSection({
+  label, count, defaultOpen = true, children,
+}: {
+  label: string;
+  count: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const ArrowIcon = open ? ChevronDown : ChevronRight;
+  return (
+    <>
+      <button className="section-header" onClick={() => setOpen((v) => !v)}>
+        <span className="section-header-arrow"><ArrowIcon size={13} /></span>
+        <span className="section-header-label">{label}</span>
+        <span className="section-header-count">({count})</span>
+      </button>
+      {open && <div className="section-body">{children}</div>}
+    </>
+  );
+}
+
+/* ===== 单个会话项（自管理 hover 与菜单）===== */
+function ConvItem({
+  c, onDelete, onMove,
+}: {
+  c: { id: string; title: string; status: string; updatedAt: number; workspaceId?: string };
+  onDelete: (id: string) => void;
+  onMove: (convId: string, wsId: string) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const active = useStore((s) => s.currentConvId === c.id);
+  const workspaces = useStore((s) => s.workspaces);
+  const statusColor = STATUS_COLORS[c.status] || "var(--text-4)";
+  const showStatusDot = c.status && c.status !== "idle";
+
+  return (
+    <div
+      className={`sidebar-conv-item ${active ? "active" : ""}`}
+      onClick={() => useStore.getState().selectConversation(c.id)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setMenuOpen(false); }}
+    >
+      <div className="sidebar-conv-main">
+        <div className="sidebar-conv-title">
+          {showStatusDot && (
+            <span
+              className={`sidebar-conv-status ${c.status === "running" ? "pulsing" : ""}`}
+              style={{ background: statusColor }}
+              title={c.status}
+            />
+          )}
+          {c.title || "新任务"}
+        </div>
+        <div className="sidebar-conv-time">{timeAgo(c.updatedAt)}</div>
+      </div>
+      {(hovered || active) && (
+        <div className="sidebar-conv-actions">
+          <button
+            className="sidebar-conv-menu"
+            title="更多"
+            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          >
+            <MoreHorizontal size={13} />
+          </button>
+          <button
+            className="sidebar-conv-del"
+            title="删除"
+            onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
+          >
+            <Trash2 size={13} />
+          </button>
+          {menuOpen && (
+            <div className="conv-move-menu" onClick={(e) => e.stopPropagation()}>
+              <div className="conv-move-label"><FolderInput size={12} /> 移动到空间</div>
+              {workspaces.length === 0 && (
+                <div style={{ padding: "4px 7px", fontSize: 11.5, color: "var(--text-3)" }}>暂无空间</div>
+              )}
+              {workspaces.map((w) => (
+                <button
+                  key={w.id}
+                  className={`conv-move-item ${w.id === c.workspaceId ? "current" : ""}`}
+                  onClick={() => { if (w.id !== c.workspaceId) onMove(c.id, w.id); setMenuOpen(false); }}
+                >
+                  <span><WorkspaceIcon name={w.icon} /></span>{w.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===== 空间项（可折叠，内含该空间的会话）===== */
+function WorkspaceItem({ ws, convs }: {
+  ws: { id: string; name: string; icon: string };
+  convs: { id: string; title: string; status: string; updatedAt: number; workspaceId?: string }[];
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const ArrowIcon = expanded ? ChevronDown : ChevronRight;
+
+  return (
+    <div className="ws-item">
+      <button className="ws-item-header" onClick={() => setExpanded((v) => !v)}>
+        <span className="ws-item-arrow"><ArrowIcon size={14} /></span>
+        <span className="ws-item-icon"><WorkspaceIcon name={ws.icon} /></span>
+        <span className="ws-item-name">{ws.name}</span>
+      </button>
+
+      {expanded && (
+        <div className="ws-item-convs">
+          {convs.length === 0 && (
+            <div className="ws-item-empty">暂无对话</div>
+          )}
+          {convs.map((c) => (
+            <ConvItem
+              key={c.id}
+              c={c}
+              onDelete={(id) => useStore.getState().deleteConversation(id)}
+              onMove={(cid, wid) => useStore.getState().assignConversation(cid, wid)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ===== 主侧边栏 ===== */
 export default function Sidebar() {
   const {
-    activeCategory, setCategory, conversations, currentConvId,
-    selectConversation, createConversation, deleteConversation,
+    activeCategory, setCategory, conversations,
+    createConversation,
     toggleSidebar, searchQuery, theme, toggleTheme, setShowSettings,
+    workspaces,
   } = useStore();
-  const [hoverConv, setHoverConv] = useState<string | null>(null);
+
+  // 分离：未归入空间的会话（任务）vs 按空间分组的会话
+  const { taskConvs, spaceMap } = useMemo(() => {
+    const map = new Map<string, typeof conversations>();
+    for (const ws of workspaces) map.set(ws.id, []);
+    const tasks: typeof conversations = [];
+    for (const c of conversations) {
+      if (c.workspaceId && map.has(c.workspaceId)) {
+        map.get(c.workspaceId)!.push(c);
+      } else {
+        tasks.push(c);
+      }
+    }
+    return { taskConvs: tasks, spaceMap: map };
+  }, [conversations, workspaces]);
+
+  // 各空间的会话计数
+  const spaceTotal = workspaces.reduce((sum, ws) => sum + (spaceMap.get(ws.id)?.length || 0), 0);
 
   return (
     <aside className="sidebar">
-      {/* 标题栏 */}
+      {/* ── 标题栏 ── */}
       <div className="sidebar-titlebar">
         <button className="sidebar-icon-btn" onClick={toggleSidebar} title="收起侧边栏">
           <PanelLeft size={17} />
@@ -50,7 +206,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* 新任务按钮 */}
+      {/* ── 新建任务按钮 ── */}
       <div className="sidebar-new-task">
         <button className="new-task-btn" onClick={() => createConversation()}>
           <Plus size={16} strokeWidth={2.5} />
@@ -58,7 +214,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* 分类导航 */}
+      {/* ── 分类导航 ── */}
       <nav className="sidebar-nav">
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
@@ -93,7 +249,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* 搜索 */}
+      {/* ── 搜索 ── */}
       <div className="sidebar-search">
         <Search size={13} color="var(--text-3)" />
         <input
@@ -107,55 +263,51 @@ export default function Sidebar() {
         />
       </div>
 
-      {/* 任务列表 */}
-      <div className="sidebar-section-label">任务</div>
-      <div className="sidebar-conv-list">
-        {conversations.length === 0 && (
+      {/* ═══════ 会话列表区域 ═══════ */}
+      <div className="sidebar-list-area">
+
+        {/* ── 任务 (N) ── */}
+        <CollapsibleSection label="任务" count={taskConvs.length}>
+          {taskConvs.length === 0 ? (
+            <div className="sidebar-section-empty">暂无任务</div>
+          ) : (
+            <div className="sidebar-conv-list">
+              {taskConvs.map((c) => (
+                <ConvItem
+                  key={c.id}
+                  c={c}
+                  onDelete={(id) => useStore.getState().deleteConversation(id)}
+                  onMove={(cid, wid) => useStore.getState().assignConversation(cid, wid)}
+                />
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
+
+        {/* ── 空间 (M) ── */}
+        <CollapsibleSection label="空间" count={spaceTotal}>
+          {workspaces.length === 0 ? (
+            <div className="sidebar-section-empty">暂无空间</div>
+          ) : (
+            <div className="workspace-list">
+              {workspaces.map((ws) => (
+                <WorkspaceItem
+                  key={ws.id}
+                  ws={ws}
+                  convs={spaceMap.get(ws.id) || []}
+                />
+              ))}
+            </div>
+          )}
+        </CollapsibleSection>
+
+        {/* 完全空状态 */}
+        {taskConvs.length === 0 && workspaces.length === 0 && conversations.length === 0 && (
           <div className="sidebar-conv-empty">暂无任务，点击上方新建</div>
         )}
-        {conversations.map((c) => {
-          const active = c.id === currentConvId;
-          const isHover = hoverConv === c.id;
-          const statusColor = STATUS_COLORS[c.status] || "var(--text-4)";
-          const showStatusDot = c.status && c.status !== "idle";
-          return (
-            <div
-              key={c.id}
-              className={`sidebar-conv-item ${active ? "active" : ""}`}
-              onClick={() => selectConversation(c.id)}
-              onMouseEnter={() => setHoverConv(c.id)}
-              onMouseLeave={() => setHoverConv(null)}
-            >
-              <div className="sidebar-conv-main">
-                <div className="sidebar-conv-title">
-                  {showStatusDot && (
-                    <span
-                      className={`sidebar-conv-status ${c.status === "running" ? "pulsing" : ""}`}
-                      style={{ background: statusColor }}
-                      title={c.status}
-                    />
-                  )}
-                  {c.title || "新任务"}
-                </div>
-                <div className="sidebar-conv-time">{timeAgo(c.updatedAt)}</div>
-              </div>
-              {(isHover || active) && (
-                <button
-                  className="sidebar-conv-del"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteConversation(c.id);
-                  }}
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
-            </div>
-          );
-        })}
       </div>
 
-      {/* 底部 */}
+      {/* ── 底部 ── */}
       <div className="sidebar-footer">
         <div className="sidebar-user-avatar">HF</div>
         <div className="sidebar-user-info">

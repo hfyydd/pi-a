@@ -10,6 +10,7 @@ Pi-a = 本地优先 AI 桌面助手，Deno Desktop 架构（main.ts 起 Deno.ser
 - **技能**：~/.pi-a/skills/<name>/SKILL.md（frontmatter name+description + markdown body）。5 个内置技能在 src/agent/skills.ts writeBuiltinSkills。加载用 pi-coding-agent 的 loadSkills。
 - **启动**：`deno task desktop` 编译打包 pi-a.app 并签名，但打包后父进程退出不自动开窗，需再 `open pi-a.app`。运行进程名 laufey_webview。重启：先 pkill laufey_webview，再 deno task desktop，再 open。
 - **权限三层**：readonly(L1)/default(L2)/full(L3)。readonly 拦截所有写工具；default 写工具走确认弹窗（tool_confirmation 事件）；full 全放行。危险命令黑名单 DANGEROUS_PATTERNS 所有级别强制拦截。
+- **UI 图标规范（用户强约束）**：**严禁用 emoji 作 UI 图标**。所有控件图标/状态指示/头像/工作空间图标必须用 lucide-react 线性图标（与 WorkBuddy 同款）。交付前必须自查 emoji 残留、重复元素、逻辑自洽。用户极度反感"AI 自动生成的廉价感"。
 
 ## 进度
 - Sprint 1（P0 价值闭环）：✅ 全部完成（SSE/导出/PDF读/项目/专家）
