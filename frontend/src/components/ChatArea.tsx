@@ -230,13 +230,10 @@ export default function ChatArea() {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* 顶栏 */}
-      <header style={{
-        height: 40, flexShrink: 0, display: "flex", alignItems: "center", gap: 8,
-        padding: "0 20px", borderBottom: "1px solid var(--border-soft)", background: "var(--bg)",
-      }}>
+      <header className="chat-header">
         {sidebarCollapsed && (
           <button onClick={toggleSidebar} title="展开侧边栏"
-            style={{ width: 28, height: 28, border: "none", background: "transparent", borderRadius: 6, color: "var(--text-3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            style={{ width: 28, height: 28, border: "none", background: "transparent", borderRadius: 6, color: "var(--text-3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
           </button>
         )}

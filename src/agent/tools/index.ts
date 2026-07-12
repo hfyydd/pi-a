@@ -12,6 +12,8 @@ import { indexDocTool, searchDocsTool } from "./rag.ts";
 import { taskTool } from "./task.ts";
 import { sandboxedBashTool } from "./sandbox.ts";
 import { callSubagentTool } from "./subagent.ts";
+import { askUserQuestionTool } from "./ask.ts";
+import { connectCloudServiceTool } from "./connect_cloud_service.ts";
 
 const HOME = Deno.env.get("HOME") || "/tmp";
 
@@ -56,6 +58,9 @@ export function getFullTools(): AgentTool<any>[] {
     indexDocTool,
     searchDocsTool,
     taskTool,
+    // 交互式提问（对标 WorkBuddy AskUserQuestion）
+    askUserQuestionTool,
+    connectCloudServiceTool,
     ...mcpTools,
   ];
 }
@@ -63,7 +68,7 @@ export function getFullTools(): AgentTool<any>[] {
 /** 只读工具（Plan 模式） */
 export function getReadOnlyTools(): AgentTool<any>[] {
   const ro = createReadOnlyTools(HOME);
-  return [...ro, memoryRecallTool, readDocTool, webFetchTool, webSearchTool];
+  return [...ro, memoryRecallTool, readDocTool, webFetchTool, webSearchTool, askUserQuestionTool, connectCloudServiceTool];
 }
 
 /** 兼容旧接口 */
@@ -71,4 +76,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, sandboxedBashTool, callSubagentTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, sandboxedBashTool, callSubagentTool, askUserQuestionTool, connectCloudServiceTool };

@@ -26,9 +26,21 @@ export function loadSkillsPrompt(): string {
       skillPaths: [SKILLS_DIR],
       includeDefaults: false,
     });
-    if (result.skills.length === 0) return "";
+    const activeSkills = result.skills.filter(s => {
+      try {
+        const text = Deno.readTextFileSync(s.filePath);
+        const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
+        if (!m) return true;
+        const fm = m[1];
+        const disabled = fm.match(/^disabled:\s*(true|false)$/m)?.[1]?.trim() === "true";
+        return !disabled;
+      } catch {
+        return true;
+      }
+    });
+    if (activeSkills.length === 0) return "";
     return "\n\n<skills>\n你可以使用以下技能。用户提到相关任务时，按技能描述的方式完成任务：\n" +
-      formatSkillsForPrompt(result.skills) +
+      formatSkillsForPrompt(activeSkills) +
       "\n</skills>";
   } catch (e) {
     console.warn("[skills] 加载失败:", e);
@@ -119,17 +131,31 @@ description: 针对文档内容回答问题
 `,
   };
 
+  const { getSetting } = await import("../domains/settings/node/store.ts");
+  const { parseSkillFrontmatter } = await import("../domains/skill/node/store.ts");
+  const autoUpdate = getSetting("auto_update_skills", "true") === "true";
+
   for (const [name, content] of Object.entries(builtins)) {
     const skillDir = `${SKILLS_DIR}/${name}`;
     const skillFile = `${skillDir}/SKILL.md`;
     try {
       await Deno.mkdir(skillDir, { recursive: true });
-      // 不覆盖已有技能（用户可能自定义了）
       try {
-        await Deno.stat(skillFile);
+        const stat = await Deno.stat(skillFile);
+        if (stat.isFile && autoUpdate) {
+          const currentText = await Deno.readTextFile(skillFile);
+          const parsed = parseSkillFrontmatter(currentText);
+          if (!parsed.edited && currentText.trim() !== content.trim()) {
+            await Deno.writeTextFile(skillFile, content);
+            console.log(`[skills] 已自动更新内置技能: ${name}`);
+          }
+        }
       } catch {
         await Deno.writeTextFile(skillFile, content);
+        console.log(`[skills] 初始化内置技能: ${name}`);
       }
-    } catch { /* 忽略 */ }
+    } catch (e) {
+      console.warn(`[skills] 写入/更新内置技能 ${name} 失败:`, (e as Error).message);
+    }
   }
 }

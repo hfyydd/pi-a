@@ -1,18 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
-  Search, Plus, Settings, PanelLeft, Sun, Moon, MessageSquare,
-  FolderKanban, Star, Cog, Trash2, MoreHorizontal, FolderInput, SlidersHorizontal,
+  Search, Plus, Settings, PanelLeft, Sun, Moon,
+  Star, Cog, Trash2, MoreHorizontal, FolderInput, SlidersHorizontal,
   ChevronDown, ChevronRight, X, RotateCcw, Check,
 } from "lucide-react";
 import "./Sidebar.css";
 import { WorkspaceIcon } from "./WorkspaceIcon";
+import { t } from "../utils/i18n";
 
 const CATEGORIES = [
-  { id: "assistant", label: "助理", icon: MessageSquare, color: "var(--cat-a)", enabled: false },
-  { id: "project", label: "项目", icon: FolderKanban, color: "var(--cat-p)", enabled: false },
-  { id: "expert", label: "专家·技能·连接器", icon: Star, color: "var(--cat-c)", enabled: false },
-  { id: "automation", label: "自动化", icon: Cog, color: "var(--cat-u)", enabled: false },
+  { id: "expert", labelKey: "experts_skills", icon: Star, color: "var(--cat-c)", enabled: true },
+  { id: "automation", labelKey: "automation", icon: Cog, color: "var(--cat-u)", enabled: true },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,29 +25,29 @@ const STATUS_COLORS: Record<string, string> = {
 
 /* 筛选选项（对齐 WorkBuddy 截图2） */
 const STATUS_OPTIONS = [
-  { key: "", label: "全部状态" },
-  { key: "running", label: "进行中" },
-  { key: "done", label: "已完成" },
-  { key: "failed", label: "失败" },
-  { key: "pending", label: "待处理" },
-  { key: "planning", label: "规划中" },
+  { key: "", labelKey: "all_status" },
+  { key: "running", labelKey: "running" },
+  { key: "done", labelKey: "done" },
+  { key: "failed", labelKey: "failed" },
+  { key: "pending", labelKey: "pending" },
+  { key: "planning", labelKey: "planning" },
 ] as const;
 
 const TIME_OPTIONS = [
-  { key: "", label: "全部时间" },
-  { key: "today", label: "今天" },
-  { key: "week", label: "最近 7 天" },
-  { key: "month", label: "最近 30 天" },
+  { key: "", labelKey: "all_time" },
+  { key: "today", labelKey: "today" },
+  { key: "week", labelKey: "last_7_days" },
+  { key: "month", labelKey: "last_30_days" },
 ] as const;
 
 function timeAgo(ts: number): string {
   const d = Date.now() - ts;
   const m = Math.floor(d / 60000);
-  if (m < 1) return "刚刚";
-  if (m < 60) return `${m} 分钟前`;
+  if (m < 1) return t("just_now");
+  if (m < 60) return `${m} ${t("minutes_ago")}`;
   const h = Math.floor(d / 3600000);
-  if (h < 24) return `${h} 小时前`;
-  return `${Math.floor(d / 86400000)} 天前`;
+  if (h < 24) return `${h} ${t("hours_ago")}`;
+  return `${Math.floor(d / 86400000)} ${t("days_ago")}`;
 }
 
 /* ===== 可折叠 Section（任务 / 空间）===== */
@@ -113,23 +112,23 @@ function ConvItem({
         <div className="sidebar-conv-actions">
           <button
             className="sidebar-conv-menu"
-            title="更多"
+            title={t("more")}
             onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
           >
             <MoreHorizontal size={13} />
           </button>
           <button
             className="sidebar-conv-del"
-            title="删除"
+            title={t("delete")}
             onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
           >
             <Trash2 size={13} />
           </button>
           {menuOpen && (
             <div className="conv-move-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="conv-move-label"><FolderInput size={12} /> 移动到空间</div>
+              <div className="conv-move-label"><FolderInput size={12} /> {t("move_to_space")}</div>
               {workspaces.length === 0 && (
-                <div style={{ padding: "4px 7px", fontSize: 11.5, color: "var(--text-3)" }}>暂无空间</div>
+                <div style={{ padding: "4px 7px", fontSize: 11.5, color: "var(--text-3)" }}>{t("no_space_available")}</div>
               )}
               {workspaces.map((w) => (
                 <button
@@ -167,7 +166,7 @@ function WorkspaceItem({ ws, convs }: {
       {expanded && (
         <div className="ws-item-convs">
           {convs.length === 0 && (
-            <div className="ws-item-empty">暂无对话</div>
+            <div className="ws-item-empty">{t("no_conversations")}</div>
           )}
           {convs.map((c) => (
             <ConvItem
@@ -184,7 +183,7 @@ function WorkspaceItem({ ws, convs }: {
 }
 
 /* ===== 主侧边栏 ===== */
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const {
     activeCategory, setCategory, conversations,
     resetToWelcome,
@@ -203,7 +202,7 @@ export default function Sidebar() {
     if (!filterOpen) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest(".sidebar-titlebar")) return;
+      if (t.closest(".sidebar-header-container")) return;
       setFilterOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -252,33 +251,51 @@ export default function Sidebar() {
   // 各空间的会话计数
   const spaceTotal = workspaces.reduce((sum, ws) => sum + (spaceMap.get(ws.id)?.length || 0), 0);
 
+  const isMac = useMemo(() => navigator.userAgent.includes("Mac"), []);
+
+  // 收起状态：渲染窄 rail（保留交通灯占位 + 常驻展开按钮），不卸载以免丢失展开入口
+  if (collapsed) {
+    return (
+      <aside className="sidebar collapsed">
+        <div className="sidebar-collapsed-rail">
+          {isMac && <div className="sidebar-traffic-lights-spacer-v" />}
+          <button className="sidebar-icon-btn" onClick={toggleSidebar} title="展开侧边栏">
+            <PanelLeft size={17} />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="sidebar">
-      {/* ── 标题栏 ── */}
-      <div className="sidebar-titlebar">
-        <button className="sidebar-icon-btn" onClick={toggleSidebar} title="收起侧边栏">
-          <PanelLeft size={17} />
-        </button>
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">π</div>
-          <span className="sidebar-brand-name">Pi-a</span>
-        </div>
-        {/* 检索 / 筛选（标题栏右侧，对齐 WorkBuddy） */}
-        <div className="sidebar-titlebar-actions">
-          <button
-            className={`sidebar-icon-btn ${searchOpen ? "active" : ""}`}
-            title="检索"
-            onClick={() => { setSearchOpen(true); setLocalSearchQuery(searchQuery); }}
-          >
-            <Search size={16} />
-          </button>
-          <button
-            className={`sidebar-icon-btn ${filterOpen ? "active" : ""}`}
-            title="筛选"
-            onClick={() => setFilterOpen((v) => !v)}
-          >
-            <SlidersHorizontal size={16} />
-          </button>
+      {/* ── 标题栏 (无标题栏/透明标题栏适配) ── */}
+      <div className="sidebar-header-container">
+        <div className="sidebar-top-row">
+          {isMac && <div className="sidebar-traffic-lights-spacer" />}
+          <div className="sidebar-brand-row">
+            <span className="sidebar-brand-name">Pi-a</span>
+            <span className="sidebar-brand-version">v0.0.1</span>
+          </div>
+          <div className="sidebar-top-actions">
+            <button className="sidebar-icon-btn" onClick={toggleSidebar} title="收起侧边栏">
+              <PanelLeft size={17} />
+            </button>
+            <button
+              className={`sidebar-icon-btn ${searchOpen ? "active" : ""}`}
+              title="检索"
+              onClick={() => { setSearchOpen(true); setLocalSearchQuery(searchQuery); }}
+            >
+              <Search size={16} />
+            </button>
+            <button
+              className={`sidebar-icon-btn ${filterOpen ? "active" : ""}`}
+              title="筛选"
+              onClick={() => setFilterOpen((v) => !v)}
+            >
+              <SlidersHorizontal size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -286,7 +303,7 @@ export default function Sidebar() {
       <div className="sidebar-new-task">
         <button className="new-task-btn" onClick={() => resetToWelcome()}>
           <Plus size={16} strokeWidth={2.5} />
-          <span>新建任务</span>
+          <span>{t("new_task")}</span>
         </button>
       </div>
 
@@ -295,18 +312,19 @@ export default function Sidebar() {
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
           const active = activeCategory === cat.id;
+          const label = t(cat.labelKey);
           if (!cat.enabled) {
             return (
               <button
                 key={cat.id}
                 className="sidebar-nav-item disabled"
-                onClick={() => alert(`${cat.label}功能开发中，敬请期待`)}
+                onClick={() => alert(`${label} function is under development`)}
               >
                 <span className="sidebar-nav-icon" style={{ color: "var(--text-4)" }}>
                   <Icon size={17} />
                 </span>
-                <span className="sidebar-nav-label">{cat.label}</span>
-                <span className="sidebar-nav-badge">即将上线</span>
+                <span className="sidebar-nav-label">{label}</span>
+                <span className="sidebar-nav-badge">Soon</span>
               </button>
             );
           }
@@ -319,7 +337,7 @@ export default function Sidebar() {
               <span className="sidebar-nav-icon" style={{ color: cat.color }}>
                 <Icon size={17} />
               </span>
-              <span className="sidebar-nav-label">{cat.label}</span>
+              <span className="sidebar-nav-label">{label}</span>
             </button>
           );
         })}
@@ -328,25 +346,25 @@ export default function Sidebar() {
       {/* ── 筛选下拉菜单（状态 + 时间，挂载在侧边栏根级） ── */}
       {filterOpen && (
         <div className="sidebar-filter-menu" onClick={(e) => e.stopPropagation()}>
-          <div className="filter-section-label">状态</div>
-          {STATUS_OPTIONS.map(({ key, label }) => (
+          <div className="filter-section-label">{t("status")}</div>
+          {STATUS_OPTIONS.map(({ key, labelKey }) => (
             <button
               key={key || "all-status"}
               className={`sidebar-filter-item ${filterStatus === key ? "active" : ""}`}
               onClick={() => setFilterStatus(key)}
             >
-              <span className="filter-item-label">{label}</span>
+              <span className="filter-item-label">{t(labelKey)}</span>
               {filterStatus === key && <Check size={13} />}
             </button>
           ))}
-          <div className="filter-section-label">筛选时间</div>
-          {TIME_OPTIONS.map(({ key, label }) => (
+          <div className="filter-section-label">{t("filter_time")}</div>
+          {TIME_OPTIONS.map(({ key, labelKey }) => (
             <button
               key={key || "all-time"}
               className={`sidebar-filter-item ${filterTime === key ? "active" : ""}`}
               onClick={() => setFilterTime(key)}
             >
-              <span className="filter-item-label">{label}</span>
+              <span className="filter-item-label">{t(labelKey)}</span>
               {filterTime === key && <Check size={13} />}
             </button>
           ))}
@@ -356,7 +374,7 @@ export default function Sidebar() {
             onClick={() => { setFilterStatus(""); setFilterTime(""); }}
           >
             <RotateCcw size={12} />
-            重置筛选条件
+            {t("reset_filter")}
           </button>
         </div>
       )}
@@ -380,7 +398,7 @@ export default function Sidebar() {
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setSearchOpen(false);
                 }}
-                placeholder="搜索任务"
+                placeholder={t("search_task")}
               />
               <button className="search-close-btn" onClick={() => setSearchOpen(false)}>
                 <X size={16} />
@@ -397,34 +415,34 @@ export default function Sidebar() {
                     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                     .slice(0, 50);
                   if (hits.length === 0) {
-                    return <div className="search-empty">未找到匹配的任务</div>;
+                    return <div className="search-empty">{t("no_matching_tasks")}</div>;
                   }
                   return hits.map(c => {
-                    const ws = c.workspaceId ? workspaces.find(w => w.id === c.workspaceId) : null;
-                    return (
-                      <div
-                        key={c.id}
-                        className="search-result-item"
-                        onClick={() => { useStore.getState().selectConversation(c.id); setSearchOpen(false); }}
-                      >
-                        <div className="search-result-title">{c.title || "新任务"}</div>
-                        <div className="search-result-meta">
-                          <span className="search-result-time">{timeAgo(c.updatedAt)}</span>
-                          {ws && (
-                            <>
-                              <WorkspaceIcon name={ws.icon} size={12} />
-                              <span className="search-result-ws">{ws.name}</span>
-                            </>
-                          )}
+                      const ws = c.workspaceId ? workspaces.find(w => w.id === c.workspaceId) : null;
+                      return (
+                        <div
+                          key={c.id}
+                          className="search-result-item"
+                          onClick={() => { useStore.getState().selectConversation(c.id); setSearchOpen(false); }}
+                        >
+                          <div className="search-result-title">{c.title || "新任务"}</div>
+                          <div className="search-result-meta">
+                            <span className="search-result-time">{timeAgo(c.updatedAt)}</span>
+                            {ws && (
+                              <>
+                                <WorkspaceIcon name={ws.icon} size={12} />
+                                <span className="search-result-ws">{ws.name}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  });
+                      );
+                    });
                 })()
               ) : localSearchQuery.trim() ? (
-                <div className="search-empty">未找到匹配的任务</div>
+                <div className="search-empty">{t("no_matching_tasks")}</div>
               ) : (
-                <div className="search-empty">输入关键词搜索任务</div>
+                <div className="search-empty">{t("input_keyword_search")}</div>
               )}
             </div>
           </div>
@@ -435,9 +453,9 @@ export default function Sidebar() {
       <div className="sidebar-list-area">
 
         {/* ── 任务 (N) ── */}
-        <CollapsibleSection label="任务" count={taskConvs.length}>
+        <CollapsibleSection label={t("tasks")} count={taskConvs.length}>
           {taskConvs.length === 0 ? (
-            <div className="sidebar-section-empty">暂无任务</div>
+            <div className="sidebar-section-empty">{t("no_tasks")}</div>
           ) : (
             <div className="sidebar-conv-list">
               {taskConvs.map((c) => (
@@ -453,9 +471,9 @@ export default function Sidebar() {
         </CollapsibleSection>
 
         {/* ── 空间 (M) ── */}
-        <CollapsibleSection label="空间" count={spaceTotal}>
+        <CollapsibleSection label={t("spaces")} count={spaceTotal}>
           {workspaces.length === 0 ? (
-            <div className="sidebar-section-empty">暂无空间</div>
+            <div className="sidebar-section-empty">{t("no_spaces")}</div>
           ) : (
             <div className="workspace-list">
               {workspaces.map((ws) => (
@@ -471,7 +489,7 @@ export default function Sidebar() {
 
         {/* 完全空状态 */}
         {taskConvs.length === 0 && workspaces.length === 0 && conversations.length === 0 && (
-          <div className="sidebar-conv-empty">暂无任务，点击上方新建</div>
+          <div className="sidebar-conv-empty">{t("no_task_click_above")}</div>
         )}
       </div>
 
@@ -479,13 +497,13 @@ export default function Sidebar() {
       <div className="sidebar-footer">
         <div className="sidebar-user-avatar">HF</div>
         <div className="sidebar-user-info">
-          <div className="sidebar-user-name">本地用户</div>
-          <div className="sidebar-user-plan">DeepSeek · 就绪</div>
+          <div className="sidebar-user-name">{t("local_user")}</div>
+          <div className="sidebar-user-plan">DeepSeek · {t("ready")}</div>
         </div>
-        <button className="sidebar-icon-btn" onClick={toggleTheme} title="切换主题">
+        <button className="sidebar-icon-btn" onClick={toggleTheme} title={t("toggle_theme")}>
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-        <button className="sidebar-icon-btn" onClick={() => setShowSettings(true)} title="设置">
+        <button className="sidebar-icon-btn" onClick={() => setShowSettings(true)} title={t("settings")}>
           <Settings size={16} />
         </button>
       </div>

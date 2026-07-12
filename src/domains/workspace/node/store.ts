@@ -3,6 +3,7 @@
 // conversation 通过 workspace_id 关联到 workspace
 
 import { getDb } from "../../../infra/db.ts";
+import { getSetting } from "../../settings/node/store.ts";
 
 export interface Workspace {
   id: string;
@@ -22,9 +23,27 @@ export function createWorkspace(name: string, opts?: { dirPath?: string; icon?: 
   const db = getDb();
   const id = uuid();
   const now = Date.now();
+
+  let dirPath = opts?.dirPath || "";
+  if (!dirPath) {
+    const defaultWorkspaceDir = getSetting("default_workspace_dir", "~/WorkBuddy");
+    dirPath = `${defaultWorkspaceDir}/${name}`;
+  }
+
+  // 物理创建工作空间目录
+  try {
+    const resolvedPath = dirPath.startsWith("~/")
+      ? HOME + dirPath.slice(1)
+      : dirPath;
+    Deno.mkdirSync(resolvedPath, { recursive: true });
+    console.log(`[workspace] 已物理创建工作空间目录: ${resolvedPath}`);
+  } catch (e) {
+    console.warn(`[workspace] 物理创建目录 ${dirPath} 失败:`, (e as Error).message);
+  }
+
   const ws: Workspace = {
     id, name,
-    dirPath: opts?.dirPath || "",
+    dirPath,
     icon: opts?.icon || "📁",
     lastOpenedAt: now,
     createdAt: now,

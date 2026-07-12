@@ -32,3 +32,10 @@ test_run.ts
 test_llm.ts
 test_mode.ts
 verify.ts
+
+# User requested exclusions
+references/
+.workbuddy/
+scratch/
+zcode_asar_header.json
+

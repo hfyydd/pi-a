@@ -705,6 +705,52 @@
     .mention-item .m-icon { font-size: 14px; flex-shrink: 0; }
     .mention-item .m-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mention-item .m-meta { font-size: 10px; color: var(--text-3); flex-shrink: 0; }
+
+    /* 自动化 V2 */
+    .auto-tab {
+      padding: 7px 14px; border-radius: 8px; font-size: 13px; border: 1px solid transparent;
+      background: transparent; color: var(--text-2); cursor: pointer; transition: all .15s;
+    }
+    .auto-tab:hover { background: var(--bg-hover); color: var(--text); }
+    .auto-tab.active { background: var(--bg-subtle); border-color: var(--border-strong); color: var(--text); font-weight: 500; }
+    .auto-badge { font-size: 10.5px; padding: 2px 7px; border-radius: 4px; }
+    .auto-badge.on { background: var(--green-soft); color: var(--green-text); border: 1px solid var(--green-border); }
+    .auto-badge.off { background: var(--bg); color: var(--text-3); border: 1px solid var(--border-strong); }
+    .auto-badge.once { background: var(--blue-soft); color: var(--blue-text); border: 1px solid var(--blue-border); }
+    .auto-icon-btn {
+      padding: 6px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-2); min-width: 32px; min-height: 32px;
+    }
+    .auto-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .auto-template-card:hover { border-color: var(--accent-border); transform: translateY(-1px); }
+    .auto-label { display: block; font-size: 12px; color: var(--text-2); margin-bottom: 6px; font-weight: 500; }
+    .auto-drawer-panel { animation: slideInRight .18s ease; }
+    @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .af-tool-btn {
+      padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-2);
+      font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all .15s;
+    }
+    .af-tool-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .af-tool-btn.active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+    .af-schedule-tab {
+      padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-2);
+      font-size: 13px; cursor: pointer; transition: all .15s;
+    }
+    .af-schedule-tab:hover { background: var(--bg-hover); color: var(--text); }
+    .af-schedule-tab.active { background: var(--bg-subtle); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+    .af-cron-chip {
+      padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-2);
+      font-size: 12px; cursor: pointer; transition: all .15s;
+    }
+    .af-cron-chip:hover { background: var(--bg-hover); color: var(--text); }
+    .af-cron-chip.active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+    #auto-panel select, #auto-drawer select {
+      width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border-strong);
+      background: var(--bg); color: var(--text); font-size: 13px; outline: none;
+    }
+    #auto-panel select:focus, #auto-drawer input:focus, #auto-drawer textarea:focus, #auto-drawer select:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);
+    }
   </style>
 </head>
 <body>
@@ -1523,6 +1569,7 @@
     }
 
     async function switchConv(id) {
+      if (activeCat === "automation") activeCat = "assistant";
       currentId = id; clearChat();
       [...convListEl.children].forEach(el => { if (el.classList.contains("conv-item")) el.classList.toggle("active", el.dataset.id === id); });
       if (b.getMessages) {
@@ -2480,112 +2527,400 @@
     });
 
     // ===== 自动化管理视图（功能8） =====
+    const autoIcons = {
+      alarm: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="M22 6 19 3"/><path d="M6 19l-2 2"/><path d="M18 19l2 2"/></svg>`,
+      plus: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+      calendar: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>`,
+      clock: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+      trash: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+      play: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+      pause: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`,
+      rotate: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
+      check: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+      chevron: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
+      x: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+      newspaper: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v18"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/><rect width="16" height="18" x="4" y="3" rx="2"/></svg>`,
+      book: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>`,
+      moon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
+      clipboard: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>`,
+      film: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M3 7h4"/><path d="M3 17h4"/><path d="M17 7h4"/><path d="M17 17h4"/></svg>`,
+      history: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>`,
+      bulb: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .5 2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>`,
+      phone: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.3 12.3 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.3 12.3 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`,
+      heart: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>`,
+      message: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`,
+      users: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+      image: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.83 0L6 21"/></svg>`,
+      zap: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+      cpu: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>`,
+      shield: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>`,
+    };
+    const autoTemplates = [
+      { id: "ai-news", icon: "newspaper", name: "每日 AI 新闻推送", desc: "关注当天 AI 领域的重要动态，侧重 AI coding 与具身智能。", prompt: "帮我整理今天 AI 领域的重要动态，重点关注 AI coding、具身智能和大模型进展。用中文输出 3-5 条要点，每条包含标题、摘要和来源。", cron: "0 9 * * *" },
+      { id: "english", icon: "book", name: "每日 5 个英语单词", desc: "每天推荐 5 个高频实用英语单词，包含词义、音标、例句。", prompt: "推荐 5 个高频实用英语单词，包含词义、音标、例句和记忆技巧。用表格形式输出。", cron: "0 9 * * *" },
+      { id: "bedtime", icon: "moon", name: "每日儿童睡前故事", desc: "生成 3-5 分钟可读的温和睡前故事，情节完整并附简短道理。", prompt: "写一个适合儿童的睡前故事，时长 3-5 分钟，情节温和完整，结尾附一句简单的道理。", cron: "0 20 * * *" },
+      { id: "weekly", icon: "clipboard", name: "每周工作周报", desc: "每周五汇总仓库 PR 与 Issue 进展，输出关键变更与待办。", prompt: "帮我生成本周工作周报，包括：本周完成的主要工作、关键进展、遇到的问题、下周计划。用 Markdown 格式输出。", cron: "0 17 * * 5" },
+      { id: "movie", icon: "film", name: "经典电影推荐", desc: "推荐一部高分经典电影，简要介绍剧情梗概、亮点与推荐理由。", prompt: "推荐一部经典高分电影，包含：片名、导演、年份、剧情梗概、亮点和推荐理由。", cron: "0 19 * * 6" },
+      { id: "history", icon: "history", name: "历史上的今天", desc: "从科技、电影、音乐等领域挑选一件"今天发生过"的有趣事件。", prompt: "从科技、电影、音乐或历史领域，挑选一件"历史上的今天"发生的有趣事件，简要介绍背景和意义。", cron: "0 8 * * *" },
+      { id: "why", icon: "bulb", name: "每日一个为什么", desc: "每天抛出一个有趣问题，先提问再解答，语气轻松、通俗易懂。", prompt: "每天提出一个有趣的科普问题，先给出问题，再用通俗易懂的语言解答。", cron: "0 12 * * *" },
+      { id: "family", icon: "phone", name: "父母联系提醒", desc: "每周日 10:00 提醒你给家人打电话或发消息，简单问候。", prompt: "提醒我给家人打电话或发消息，简单问候并关心他们的近况。", cron: "0 10 * * 0" },
+      { id: "health", icon: "heart", name: "体检预约提醒", desc: "在指定时间提醒确认体检时间、准备证件和注意事项。", prompt: "提醒我确认体检时间，列出需要准备的证件和注意事项。", cron: "0 9 1 * *" },
+      { id: "interview", icon: "message", name: "面试准备提醒", desc: "工作日每 2 小时提醒复习大模型面试内容，并生成 3 道练习题。", prompt: "帮我复习大模型/AI 相关面试内容，生成 3 道练习题并给出参考答案。", cron: "0 */2 * * 1-5" },
+      { id: "meeting", icon: "users", name: "会议前准备", desc: "在会议开始前提醒整理议题、目标、待确认问题和关键资料。", prompt: "帮我整理会议前的准备事项：议题、目标、待确认问题和关键资料清单。", cron: "0 9 * * 1" },
+      { id: "wallpaper", icon: "image", name: "可爱萌宠手机壁纸", desc: "随机挑选一种风格，生成一张 9:16 的可爱萌宠手机壁纸。", prompt: "生成一张 9:16 比例的可爱萌宠手机壁纸，风格清新、色彩柔和。", cron: "0 10 * * *" },
+    ];
+    let autoTab = "tasks";
     async function renderAutomationView() {
       let list = [];
       try { list = await apiGet("/api/automations"); } catch {}
+      const hasAny = list.length > 0;
       innerEl.innerHTML = `
-        <div style="max-width:780px;margin:0 auto;padding:20px 16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="width:100%;max-width:1200px;margin:0 auto;padding:24px 32px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
             <div>
-              <h2 style="font-size:17px;font-weight:600;">自动化</h2>
-              <p style="font-size:11.5px;color:var(--text-3);margin-top:2px;">定时触发执行任务。触发的会话归入"自动化"分类。</p>
+              <h2 style="font-size:18px;font-weight:600;">自动化</h2>
+              <p style="font-size:12px;color:var(--text-3);margin-top:2px;">定时触发任务，让 AI 按节奏自动运行。</p>
             </div>
-            <button class="cd-btn cd-allow" id="btn-new-auto" style="padding:7px 14px;border-radius:8px;font-size:13px;">+ 新建</button>
+            <button class="cd-btn cd-allow" id="btn-new-auto" style="padding:8px 16px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:6px;">
+              <span style="display:flex;align-items:center;">${autoIcons.plus}</span>添加自动化
+            </button>
           </div>
-          <div id="auto-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+          <div id="auto-tabs" style="display:flex;gap:8px;margin-bottom:18px;">
+            <button class="auto-tab ${autoTab === "tasks" ? "active" : ""}" data-tab="tasks">定时任务</button>
+            <button class="auto-tab ${autoTab === "runs" ? "active" : ""}" data-tab="runs">运行记录</button>
+          </div>
+          <div id="auto-panel"></div>
         </div>`;
-      const autoList = $("auto-list");
-      if (list.length === 0) {
-        autoList.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;border:1px dashed var(--border-soft);border-radius:10px;">暂无自动化。点击"新建"创建定时任务。</div>`;
-      } else {
-        for (const a of list) {
-          const cron = a.triggerType === "cron" ? (a.triggerConfig.cron || "-") : "文件监听";
-          const next = a.nextRun ? new Date(a.nextRun).toLocaleString("zh-CN") : "未调度";
-          const last = a.lastRun ? new Date(a.lastRun).toLocaleString("zh-CN") : "从未";
-          const action = a.actionType === "skill" ? `技能: ${a.actionConfig.skill || ""}` : "自定义提示词";
-          const card = document.createElement("div");
-          card.style.cssText = "background:var(--bg-subtle);border:1px solid var(--border-soft);border-radius:10px;padding:14px;";
-          card.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                  <span style="font-weight:600;font-size:14px;">${esc(a.name)}</span>
-                  <span style="font-size:10.5px;padding:2px 6px;border-radius:4px;background:${a.enabled ? "rgba(34,197,94,.15)" : "var(--bg)"};color:${a.enabled ? "#22c55e" : "var(--text-3)"};">${a.enabled ? "已启用" : "已停用"}</span>
-                </div>
-                <div style="font-size:12px;color:var(--text-3);line-height:1.7;">
-                  <div>⏰ 触发: <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:11px;">${esc(cron)}</code></div>
-                  <div>⚡ 动作: ${esc(action)}</div>
-                  <div>🕐 下次: ${esc(next)} ｜ 上次: ${esc(last)}</div>
-                </div>
-                <div id="runs-${a.id}" style="margin-top:8px;"></div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-                <button class="cd-btn" onclick="toggleAuto('${a.id}', ${!a.enabled})" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">${a.enabled ? "停用" : "启用"}</button>
-                <button class="cd-btn" onclick="runAutoNow('${a.id}')" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">立即运行</button>
-                <button class="cd-btn" onclick="loadAutoRuns('${a.id}')" style="padding:5px 10px;border-radius:6px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">运行记录</button>
-                <button class="cd-btn cd-deny" onclick="delAuto('${a.id}','${esc(a.name)}')" style="padding:5px 10px;border-radius:6px;font-size:11px;">删除</button>
-              </div>
-            </div>`;
-          autoList.appendChild(card);
-        }
-      }
-      $("btn-new-auto").onclick = showAutoForm;
+      $("btn-new-auto").onclick = () => showAutoDrawer();
+      document.querySelectorAll(".auto-tab").forEach((btn) => {
+        btn.onclick = () => { autoTab = btn.dataset.tab; renderAutomationView(); };
+      });
+      if (autoTab === "tasks") renderAutoTasksPanel(list, hasAny);
+      else renderAutoRunsPanel(list);
     }
-    async function showAutoForm() {
-      const skills = await apiGet("/api/skills").catch(() => []);
-      const skillOpts = skills.map((s) => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
-      const f = document.createElement("div");
-      f.style.cssText = "background:var(--bg-subtle);border:1px solid var(--accent);border-radius:10px;padding:16px;margin-top:12px;";
-      f.innerHTML = `
-        <div style="font-weight:600;font-size:13px;margin-bottom:10px;">新建自动化</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <input id="af-name" placeholder="名称（如：每日桌面整理）" style="padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
-          <div>
-            <label style="font-size:11px;color:var(--text-3);">Cron 表达式（分 时 日 月 周，如 0 9 * * 1 = 每周一9点）</label>
-            <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
-              <input id="af-cron" value="0 9 * * *" style="flex:1;min-width:140px;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--mono);" />
-              <button class="cd-btn" onclick="document.getElementById('af-cron').value='*/5 * * * *'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每5分</button>
-              <button class="cd-btn" onclick="document.getElementById('af-cron').value='0 9 * * *'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每天9点</button>
-              <button class="cd-btn" onclick="document.getElementById('af-cron').value='0 9 * * 1'" style="padding:6px 10px;font-size:11px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:6px;">每周一</button>
+    function renderAutoTasksPanel(list, hasAny) {
+      const panel = $("auto-panel");
+      if (!hasAny) {
+        panel.innerHTML = renderAutoEmptyState();
+        bindTemplateCards();
+        return;
+      }
+      panel.innerHTML = `<div id="auto-list" style="display:flex;flex-direction:column;gap:10px;"></div>`;
+      const autoList = $("auto-list");
+      for (const a of list) {
+        const freq = formatFrequency(a);
+        const next = a.nextRun ? new Date(a.nextRun).toLocaleString("zh-CN") : "未调度";
+        const last = a.lastRun ? new Date(a.lastRun).toLocaleString("zh-CN") : "从未";
+        const action = a.actionType === "skill" ? `技能: ${a.actionConfig.skill || ""}` : "自定义提示词";
+        const card = document.createElement("div");
+        card.className = "auto-card";
+        card.style.cssText = "background:var(--bg-subtle);border:1px solid var(--border-soft);border-radius:12px;padding:14px;";
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+                <span style="font-weight:600;font-size:14px;">${esc(a.name)}</span>
+                <span class="auto-badge ${a.enabled ? "on" : "off"}">${a.enabled ? "已启用" : "已停用"}</span>
+                ${a.scheduleType === "once" ? `<span class="auto-badge once">单次</span>` : ""}
+              </div>
+              <div style="font-size:12px;color:var(--text-3);line-height:1.7;">
+                <div style="display:flex;align-items:center;gap:5px;"><span style="display:flex;color:var(--text-3);">${autoIcons.clock}</span>频率: ${esc(freq)}</div>
+                <div style="display:flex;align-items:center;gap:5px;"><span style="display:flex;color:var(--text-3);">${autoIcons.zap}</span>动作: ${esc(action)}</div>
+                <div style="display:flex;align-items:center;gap:5px;"><span style="display:flex;color:var(--text-3);">${autoIcons.calendar}</span>下次: ${esc(next)} ｜ 上次: ${esc(last)}</div>
+              </div>
+              <div id="runs-${a.id}" style="margin-top:8px;"></div>
             </div>
-          </div>
+            <div style="display:flex;flex-direction:row;gap:6px;flex-shrink:0;align-items:flex-start;">
+              <button class="cd-btn auto-icon-btn" title="${a.enabled ? "停用" : "启用"}" onclick="toggleAuto('${a.id}', ${!a.enabled})">${a.enabled ? autoIcons.pause : autoIcons.play}</button>
+              <button class="cd-btn auto-icon-btn" title="立即运行" onclick="runAutoNow('${a.id}')">${autoIcons.play}</button>
+              <button class="cd-btn auto-icon-btn" title="运行记录" onclick="loadAutoRuns('${a.id}')">${autoIcons.rotate}</button>
+              <button class="cd-btn auto-icon-btn cd-deny" title="删除" onclick="delAuto('${a.id}','${esc(a.name)}')">${autoIcons.trash}</button>
+            </div>
+          </div>`;
+        autoList.appendChild(card);
+      }
+    }
+    function renderAutoRunsPanel(all) {
+      const panel = $("auto-panel");
+      panel.innerHTML = `<div id="auto-runs-aggregate" style="display:flex;flex-direction:column;gap:10px;"></div>`;
+      loadAllAutoRuns(all);
+    }
+    async function loadAllAutoRuns(all) {
+      const box = $("auto-runs-aggregate");
+      const runs = [];
+      for (const a of all) {
+        try {
+          const rs = await apiGet(`/api/automations/${a.id}/runs`);
+          for (const r of rs) runs.push({ ...r, autoName: a.name, autoId: a.id });
+        } catch {}
+      }
+      runs.sort((a, b) => b.startedAt - a.startedAt);
+      if (runs.length === 0) {
+        box.innerHTML = `
+          <div style="padding:70px 20px;text-align:center;color:var(--text-3);">
+            <div style="margin-bottom:14px;display:flex;justify-content:center;"><span style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:var(--bg-subtle);border:1px solid var(--border-soft);color:var(--text-3);">${autoIcons.clipboard}</span></div>
+            <div style="font-size:13px;">暂无运行记录</div>
+          </div>`;
+        return;
+      }
+      box.innerHTML = runs.slice(0, 100).map((r) => `
+        <div style="background:var(--bg-subtle);border:1px solid var(--border-soft);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <div>
-            <label style="font-size:11px;color:var(--text-3);">动作类型</label>
-            <select id="af-action-type" style="width:100%;padding:8px;margin-top:4px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" onchange="toggleAutoAction()">
-              <option value="prompt">自定义提示词</option>
-              <option value="skill">执行技能</option>
-            </select>
+            <div style="font-weight:600;font-size:13px;">${esc(r.autoName)}</div>
+            <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">${new Date(r.startedAt).toLocaleString("zh-CN")} · ${statusBadge(r.status)} ${r.summary ? "· " + esc(r.summary) : ""}</div>
           </div>
-          <div id="af-prompt-box">
-            <textarea id="af-prompt" placeholder="要让 Agent 执行的提示词..." style="width:100%;min-height:70px;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+          ${r.sessionId ? `<button class="cd-btn" style="font-size:12px;padding:5px 10px;border-radius:6px;" onclick="switchConv('${r.sessionId}')">查看会话</button>` : ""}
+        </div>`).join("");
+    }
+    function statusBadge(status) {
+      if (status === "completed") return `<span style="color:var(--green-text);">已完成</span>`;
+      if (status === "inProgress") return `<span style="color:var(--amber);">运行中</span>`;
+      return `<span style="color:var(--red-text);">失败</span>`;
+    }
+    function formatFrequency(a) {
+      if (a.triggerType !== "cron") return "文件监听";
+      if (a.scheduleType === "once") {
+        return a.triggerConfig.onceAt ? "单次: " + new Date(a.triggerConfig.onceAt).toLocaleString("zh-CN") : "单次";
+      }
+      if (a.scheduleType === "interval") {
+        const m = a.triggerConfig.intervalMinutes ?? 30;
+        return `每 ${m < 60 ? m + " 分钟" : m / 60 + " 小时"}`;
+      }
+      const c = a.triggerConfig.cron || "";
+      const map = {
+        "0 9 * * *": "每天 09:00",
+        "0 8 * * *": "每天 08:00",
+        "0 12 * * *": "每天 12:00",
+        "0 17 * * 5": "每周五 17:00",
+        "0 9 * * 1": "每周一 09:00",
+        "0 10 * * 0": "每周日 10:00",
+        "0 19 * * 6": "每周六 19:00",
+        "0 20 * * *": "每天 20:00",
+        "0 9 1 * *": "每月 1 日 09:00",
+        "0 */2 * * 1-5": "工作日每 2 小时",
+      };
+      return map[c] || c;
+    }
+    function renderAutoEmptyState() {
+      return `
+        <div style="padding:56px 20px;text-align:center;border:1px dashed var(--border-soft);border-radius:16px;margin-bottom:24px;background:var(--bg-subtle);">
+          <div style="margin-bottom:14px;display:flex;justify-content:center;"><span style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:var(--bg);border:1px solid var(--border-soft);color:var(--text-3);">${autoIcons.alarm}</span></div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px;">开启你的第一个自动化任务吧</div>
+          <button class="cd-btn cd-allow" id="btn-empty-new" style="margin-top:8px;padding:8px 16px;border-radius:8px;font-size:13px;display:inline-flex;align-items:center;gap:6px;"><span style="display:flex;align-items:center;">${autoIcons.plus}</span>添加自动化</button>
+        </div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;">自动化任务模版</div>
+        <div id="auto-template-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">
+          ${autoTemplates.map((t) => `
+            <div class="auto-template-card" data-id="${t.id}" style="background:var(--bg-subtle);border:1px solid var(--border-soft);border-radius:12px;padding:14px;cursor:pointer;transition:all .15s;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <span style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--bg);border:1px solid var(--border-soft);color:var(--accent);">${autoIcons[t.icon]}</span>
+                <div style="font-weight:600;font-size:13px;">${esc(t.name)}</div>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${esc(t.desc)}</div>
+            </div>
+          `).join("")}
+        </div>`;
+    }
+    function bindTemplateCards() {
+      $("btn-empty-new") && ($("btn-empty-new").onclick = () => showAutoDrawer());
+      document.querySelectorAll(".auto-template-card").forEach((card) => {
+        card.onclick = () => {
+          const t = autoTemplates.find((x) => x.id === card.dataset.id);
+          if (t) showAutoDrawer({ name: t.name, prompt: t.prompt, cron: t.cron });
+        };
+      });
+    }
+    async function showAutoDrawer(prefill = {}) {
+      const [skills, workspaces, mcp, experts] = await Promise.all([
+        apiGet("/api/skills").catch(() => []),
+        apiGet("/api/workspaces").catch(() => []),
+        apiGet("/api/mcp").catch(() => ({ config: { mcpServers: {} } })),
+        apiGet("/api/experts").catch(() => []),
+      ]);
+      const connectors = Object.keys(mcp?.config?.mcpServers || {}).map((k) => ({ id: k, name: k }));
+      const skillOpts = skills.map((s) => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join("");
+      const wsOpts = `<option value="">不指定工作空间</option>` + workspaces.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join("");
+      const expertOpts = `<option value="">不召唤专家</option>` + experts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
+      const connectorOpts = `<option value="">不授权连接器</option>` + connectors.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+
+      const drawer = document.createElement("div");
+      drawer.id = "auto-drawer";
+      drawer.style.cssText = "position:fixed;inset:0;z-index:120;display:flex;justify-content:flex-end;background:var(--overlay);";
+      drawer.innerHTML = `
+        <div class="auto-drawer-panel" style="width:min(520px,100%);height:100%;background:var(--bg);border-left:1px solid var(--border-soft);display:flex;flex-direction:column;box-shadow:var(--shadow-lg);">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border-soft);">
+            <div style="font-size:16px;font-weight:600;">添加自动化任务</div>
+            <button class="cd-btn auto-icon-btn" id="auto-drawer-close">${autoIcons.x}</button>
           </div>
-          <div id="af-skill-box" style="display:none;">
-            <select id="af-skill" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;">${skillOpts}</select>
+          <div style="flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <label class="auto-label">名称</label>
+              <input id="af-name" value="${esc(prefill.name || "")}" placeholder="任务名称" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+            </div>
+            <div>
+              <label class="auto-label">工作空间（可选）</label>
+              <select id="af-workspace">${wsOpts}</select>
+            </div>
+            <div>
+              <label class="auto-label">提示词</label>
+              <textarea id="af-prompt" placeholder="要让 Agent 自动执行的提示词..." style="width:100%;min-height:120px;padding:10px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;resize:vertical;">${esc(prefill.prompt || "")}</textarea>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="af-tool-btn active" data-tool="auto" title="由 Agent 自动选择工具">${autoIcons.zap}Auto</button>
+              <button type="button" class="af-tool-btn" data-tool="skill">${autoIcons.cpu}技能</button>
+              <button type="button" class="af-tool-btn" data-tool="expert">${autoIcons.shield}召唤专家</button>
+              <button type="button" class="af-tool-btn" data-tool="permission">${autoIcons.shield}完全访问权限</button>
+            </div>
+            <div id="af-skill-row" style="display:none;">
+              <label class="auto-label">选择技能</label>
+              <select id="af-skill">${skillOpts}</select>
+            </div>
+            <div id="af-expert-row" style="display:none;">
+              <label class="auto-label">选择专家</label>
+              <select id="af-expert">${expertOpts}</select>
+            </div>
+            <div id="af-permission-row" style="display:none;">
+              <label class="auto-label">权限级别</label>
+              <select id="af-permission">
+                <option value="readonly">只读 (L1)</option>
+                <option value="default" selected>默认 (L2)</option>
+                <option value="full">完全访问 (L3)</option>
+              </select>
+            </div>
+            <div>
+              <label class="auto-label">连接器（勾选即授权该连接器在任务中免确认使用）</label>
+              <select id="af-connector">${connectorOpts}</select>
+            </div>
+            <div>
+              <label class="auto-label">执行频率</label>
+              <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <button type="button" class="af-schedule-tab active" data-schedule="cron">周期</button>
+                <button type="button" class="af-schedule-tab" data-schedule="interval">按间隔</button>
+                <button type="button" class="af-schedule-tab" data-schedule="once">单次</button>
+              </div>
+              <div id="af-schedule-cron" class="af-schedule-box">
+                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+                  <button type="button" class="af-cron-chip" data-cron="0 9 * * *">每天</button>
+                  <button type="button" class="af-cron-chip" data-cron="0 9 * * 1">每周一</button>
+                  <button type="button" class="af-cron-chip" data-cron="0 9 1 * *">每月 1 日</button>
+                  <button type="button" class="af-cron-chip" data-cron="custom">自定义</button>
+                </div>
+                <input id="af-cron" value="${esc(prefill.cron || "0 9 * * *")}" placeholder="分 时 日 月 周" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--mono);" />
+              </div>
+              <div id="af-schedule-interval" class="af-schedule-box" style="display:none;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input id="af-interval" type="number" value="30" min="5" style="width:100px;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+                  <select id="af-interval-unit">
+                    <option value="minutes">分钟</option>
+                    <option value="hours">小时</option>
+                  </select>
+                </div>
+              </div>
+              <div id="af-schedule-once" class="af-schedule-box" style="display:none;">
+                <input id="af-once" type="datetime-local" style="width:100%;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+              </div>
+            </div>
+            <div>
+              <label class="auto-label">生效日期范围（可选，留空表示始终生效）</label>
+              <div style="display:flex;gap:10px;">
+                <input id="af-valid-from" type="date" placeholder="开始日期" style="flex:1;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+                <input id="af-valid-until" type="date" placeholder="结束日期" style="flex:1;padding:9px 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);font-size:13px;" />
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;border:1px solid var(--border-soft);border-radius:8px;">
+              <input id="af-push" type="checkbox" style="width:16px;height:16px;" />
+              <span style="font-size:13px;">推送到 WorkBuddy 微信小程序</span>
+            </label>
           </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="cd-btn" id="af-cancel" style="padding:7px 14px;border-radius:6px;font-size:13px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">取消</button>
-            <button class="cd-btn cd-allow" id="af-save" style="padding:7px 14px;border-radius:6px;font-size:13px;">保存</button>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--border-soft);">
+            <button class="cd-btn" id="af-cancel" style="padding:8px 16px;border-radius:8px;font-size:13px;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);">取消</button>
+            <button class="cd-btn cd-allow" id="af-save" style="padding:8px 18px;border-radius:8px;font-size:13px;">保存</button>
           </div>
         </div>`;
-      $("auto-list").prepend(f);
-      $("af-cancel").onclick = () => f.remove();
+      document.body.appendChild(drawer);
+
+      // 绑定抽屉交互
+      $("auto-drawer-close").onclick = $("af-cancel").onclick = () => drawer.remove();
+      drawer.onclick = (e) => { if (e.target === drawer) drawer.remove(); };
+      document.querySelectorAll(".af-tool-btn").forEach((btn) => {
+        btn.onclick = () => {
+          document.querySelectorAll(".af-tool-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const tool = btn.dataset.tool;
+          $("af-skill-row").style.display = tool === "skill" ? "" : "none";
+          $("af-expert-row").style.display = tool === "expert" ? "" : "none";
+          $("af-permission-row").style.display = tool === "permission" ? "" : "none";
+        };
+      });
+      document.querySelectorAll(".af-schedule-tab").forEach((btn) => {
+        btn.onclick = () => {
+          document.querySelectorAll(".af-schedule-tab").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const s = btn.dataset.schedule;
+          $("af-schedule-cron").style.display = s === "cron" ? "" : "none";
+          $("af-schedule-interval").style.display = s === "interval" ? "" : "none";
+          $("af-schedule-once").style.display = s === "once" ? "" : "none";
+        };
+      });
+      document.querySelectorAll(".af-cron-chip").forEach((chip) => {
+        chip.onclick = () => {
+          const v = chip.dataset.cron;
+          if (v !== "custom") $("af-cron").value = v;
+          document.querySelectorAll(".af-cron-chip").forEach((c) => c.classList.remove("active"));
+          chip.classList.add("active");
+        };
+      });
+
       $("af-save").onclick = async () => {
         const name = $("af-name").value.trim();
-        const cron = $("af-cron").value.trim();
-        const actionType = $("af-action-type").value;
+        const prompt = $("af-prompt").value.trim();
+        const actionType = document.querySelector(".af-tool-btn.active").dataset.tool === "skill" ? "skill" : "prompt";
+        const skill = actionType === "skill" ? $("af-skill").value : "";
+        const expertId = document.querySelector(".af-tool-btn.active").dataset.tool === "expert" ? ($("af-expert").value || null) : null;
+        const permissionTool = document.querySelector(".af-tool-btn.active").dataset.tool;
+        const permission = permissionTool === "permission" ? $("af-permission").value : (permissionTool === "readonly" ? "readonly" : "default");
+        const scheduleTab = document.querySelector(".af-schedule-tab.active").dataset.schedule;
+        const connector = $("af-connector").value || null;
+        const workspaceId = $("af-workspace").value || null;
+        const validFrom = $("af-valid-from").value ? new Date($("af-valid-from").value).getTime() : null;
+        const validUntil = $("af-valid-until").value ? new Date($("af-valid-until").value).getTime() + 24*60*60*1000 - 1 : null;
+        const pushToWxmp = $("af-push").checked;
+
         if (!name) return alert("请输入名称");
-        if (!cron) return alert("请输入 cron");
-        const actionConfig = actionType === "skill" ? { skill: $("af-skill").value } : { prompt: $("af-prompt").value.trim() };
-        if (actionType === "prompt" && !actionConfig.prompt) return alert("请输入提示词");
-        const res = await apiPost("/api/automations", { name, triggerType: "cron", triggerConfig: { cron }, actionType, actionConfig });
+        if (actionType === "prompt" && !prompt) return alert("请输入提示词");
+        if (actionType === "skill" && !skill) return alert("请选择技能");
+
+        let scheduleType = scheduleTab;
+        let triggerConfig = {};
+        if (scheduleTab === "cron") {
+          const cron = $("af-cron").value.trim();
+          if (!cron) return alert("请输入 Cron 表达式");
+          triggerConfig = { cron };
+        } else if (scheduleTab === "interval") {
+          const unit = $("af-interval-unit").value;
+          let minutes = parseInt($("af-interval").value, 10);
+          if (unit === "hours") minutes *= 60;
+          if (!minutes || minutes < 5) return alert("间隔至少 5 分钟");
+          triggerConfig = { intervalMinutes: minutes };
+        } else if (scheduleTab === "once") {
+          const v = $("af-once").value;
+          if (!v) return alert("请选择执行时间");
+          const onceAt = new Date(v).getTime();
+          if (onceAt <= Date.now()) return alert("执行时间必须晚于当前时间");
+          triggerConfig = { onceAt };
+        }
+
+        const actionConfig = actionType === "skill" ? { skill } : {};
+        const payload = {
+          name, workspaceId, triggerType: "cron", triggerConfig, actionType, actionConfig,
+          prompt, expertId, permission, connector, scheduleType, validFrom, validUntil, pushToWxmp,
+        };
+        const res = await apiPost("/api/automations", payload);
         if (res.error) return alert("创建失败：" + res.error);
+        drawer.remove();
+        autoTab = "tasks";
         renderAutomationView();
       };
-    }
-    function toggleAutoAction() {
-      const t = document.getElementById("af-action-type").value;
-      document.getElementById("af-prompt-box").style.display = t === "prompt" ? "" : "none";
-      document.getElementById("af-skill-box").style.display = t === "skill" ? "" : "none";
     }
     async function toggleAuto(id, enable) {
       await apiPut(`/api/automations/${id}`, { enabled: enable });
@@ -2594,7 +2929,7 @@
     async function runAutoNow(id) {
       const res = await apiPost(`/api/automations/${id}/run`, {});
       if (res.error) return alert("运行失败：" + res.error);
-      alert("✓ 已触发，查看「自动化」分类下的会话");
+      alert("已触发，查看「自动化」分类下的会话");
       loadConversations();
     }
     async function delAuto(id, name) {
@@ -2608,14 +2943,13 @@
       const runs = await apiGet(`/api/automations/${id}/runs`);
       box.dataset.loaded = "1";
       if (runs.length === 0) { box.innerHTML = `<div style="font-size:11.5px;color:var(--text-3);padding:6px 0;">暂无运行记录</div>`; return; }
-      box.innerHTML = `<div style="font-size:11.5px;color:var(--text-3);padding:6px 0;border-top:1px solid var(--border-soft);">运行记录：</div>` +
+      box.innerHTML = `<div style="font-size:11.5px;color:var(--text-3);padding:8px 0;border-top:1px solid var(--border-soft);margin-top:8px;">运行记录：</div>` +
         runs.slice(0, 10).map((r) => `<div style="font-size:11.5px;color:var(--text-2);padding:2px 0;">${new Date(r.startedAt).toLocaleString("zh-CN")} · ${r.status} ${r.summary ? "· " + esc(r.summary) : ""}${r.sessionId ? ` · <a href="#" onclick="switchConv('${r.sessionId}');return false;" style="color:var(--accent);">查看会话</a>` : ""}</div>`).join("");
     }
     window.toggleAuto = toggleAuto;
     window.runAutoNow = runAutoNow;
     window.delAuto = delAuto;
     window.loadAutoRuns = loadAutoRuns;
-    window.toggleAutoAction = toggleAutoAction;
 
     // ===== 文件快照面板（功能17） =====
     // ===== 用量统计 =====

@@ -46,6 +46,19 @@ export interface PendingConfirm {
   sessionId: string;
 }
 
+/** 交互式提问（AskUserQuestion） */
+export interface AskQuestion {
+  question: string;
+  header?: string;
+  multiSelect?: boolean;
+  options: { label: string; description?: string }[];
+}
+export interface PendingAsk {
+  requestId: string;
+  sessionId: string;
+  questions: AskQuestion[];
+}
+
 interface AppState {
   // 侧边栏
   sidebarCollapsed: boolean;
@@ -75,11 +88,55 @@ interface AppState {
   pendingConfirm: PendingConfirm | null;
   respondConfirm: (approved: boolean) => Promise<void>;
 
+  // 交互式提问（AskUserQuestion）
+  pendingAsk: PendingAsk | null;
+  respondAsk: (answers: any) => Promise<void>;
+
   // UI 面板
   showSettings: boolean;
   showArtifacts: boolean;
   showWorkspaceManager: boolean;
   _pendingDirPath: { name: string; path: string } | null;  // 「打开本地文件夹」传给 modal 的临时状态
+
+  // 全局设置状态与动作
+  settings: {
+    defaultProvider: string;
+    defaultModelId: string;
+    docsDir: string;
+    language: string;
+    fontSize: string;
+    autoUpdateSkills: boolean;
+    autoInstallSkills: boolean;
+    keepAwake: boolean;
+    defaultWorkspaceDir: string;
+    experienceOpt: boolean;
+    agentSystemPrompt: string;
+    agentTemperature: string;
+    agentMaxTokens: string;
+    searchEngine: string;
+    sandboxSecurity: boolean;
+    deletionProtection: boolean;
+    bulkDeletionLimit: string;
+    builtinRuntime: boolean;
+    runtimePython: boolean;
+    runtimeNodejs: boolean;
+    securityFileRules: string;
+    securityCommandRules: string;
+    securityNetworkRules: string;
+    providers: any[];
+    availableProviders: any[];
+  };
+  apiKeys: Record<string, boolean>;
+  memories: Array<{ id: string; content: string; scope: string; kind: string; createdAt: number }>;
+  auditLogs: Array<{ id: number; toolName: string; args: string; isError: number; createdAt: number }>;
+
+  loadSettings: () => Promise<void>;
+  updateSettings: (patch: Partial<AppState["settings"]>) => Promise<void>;
+  saveApiKey: (provider: string, key: string) => Promise<void>;
+  deleteApiKey: (provider: string) => Promise<void>;
+  loadMemories: () => Promise<void>;
+  deleteMemory: (id: string) => Promise<void>;
+  loadAuditLogs: () => Promise<void>;
 
   // Actions
   toggleSidebar: () => void;
@@ -168,13 +225,135 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  // 模型
+  pendingAsk: null,
+
+  respondAsk: async (answers: any) => {
+    const ask = get().pendingAsk;
+    if (!ask) return;
+    set({ pendingAsk: null });
+    try {
+      await apiPost("/api/ask-answer", { requestId: ask.requestId, answers });
+    } catch (e) {
+      console.error("[ask] 发送回答失败:", e);
+    }
+  },
+
+  // 模型与设置
   modelId: "deepseek-v4-flash",
   modelProvider: "deepseek",
   showSettings: false,
   showArtifacts: false,
   showWorkspaceManager: false,
   _pendingDirPath: null,
+
+  settings: {
+    defaultProvider: "deepseek",
+    defaultModelId: "deepseek-v4-flash",
+    docsDir: "~/Desktop",
+    language: "zh-CN",
+    fontSize: "14",
+    autoUpdateSkills: true,
+    autoInstallSkills: false,
+    keepAwake: false,
+    defaultWorkspaceDir: "~/WorkBuddy",
+    experienceOpt: true,
+    agentSystemPrompt: "你是一个有用、高效的本地桌面助理，随时帮我处理各种任务。",
+    agentTemperature: "0.7",
+    agentMaxTokens: "4096",
+    searchEngine: "google",
+    sandboxSecurity: true,
+    deletionProtection: true,
+    bulkDeletionLimit: "50",
+    builtinRuntime: true,
+    runtimePython: true,
+    runtimeNodejs: true,
+    securityFileRules: JSON.stringify(["/Users/hanfeng/Desktop/pi-a", "/tmp"]),
+    securityCommandRules: JSON.stringify(["git", "deno", "npm", "python"]),
+    securityNetworkRules: JSON.stringify(["api.deepseek.com", "github.com", "deno.land"]),
+    providers: [],
+    availableProviders: [],
+  },
+  apiKeys: {},
+  memories: [],
+  auditLogs: [],
+
+  loadSettings: async () => {
+    try {
+      const data = await apiGet("/api/settings");
+      set({ settings: data });
+      if (data.fontSize) {
+        document.documentElement.style.setProperty("--app-font-size", `${data.fontSize}px`);
+      }
+      const keys = await apiGet("/api/settings/keys");
+      set({ apiKeys: keys });
+    } catch (e) {
+      console.error("[settings] loadSettings error:", e);
+    }
+  },
+
+  updateSettings: async (patch) => {
+    try {
+      const current = get().settings;
+      const next = { ...current, ...patch };
+      await apiPost("/api/settings", next);
+      set({ settings: next });
+      if (patch.fontSize) {
+        document.documentElement.style.setProperty("--app-font-size", `${patch.fontSize}px`);
+      }
+    } catch (e) {
+      console.error("[settings] updateSettings error:", e);
+    }
+  },
+
+  saveApiKey: async (provider, key) => {
+    try {
+      await apiPost("/api/settings/keys", { provider, key });
+      const apiKeys = { ...get().apiKeys, [provider]: true };
+      set({ apiKeys });
+      await get().loadSettings();
+    } catch (e) {
+      console.error("[settings] saveApiKey error:", e);
+    }
+  },
+
+  deleteApiKey: async (provider) => {
+    try {
+      await apiDelete(`/api/settings/keys/${provider}`);
+      const apiKeys = { ...get().apiKeys, [provider]: false };
+      set({ apiKeys });
+      await get().loadSettings();
+    } catch (e) {
+      console.error("[settings] deleteApiKey error:", e);
+    }
+  },
+
+  loadMemories: async () => {
+    try {
+      const list = await apiGet("/api/memories");
+      set({ memories: list });
+    } catch (e) {
+      console.error("[settings] loadMemories error:", e);
+    }
+  },
+
+  deleteMemory: async (id) => {
+    try {
+      await apiDelete(`/api/memories/${id}`);
+      const memories = get().memories.filter((m) => m.id !== id);
+      set({ memories });
+    } catch (e) {
+      console.error("[settings] deleteMemory error:", e);
+    }
+  },
+
+  loadAuditLogs: async () => {
+    try {
+      const list = await apiGet("/api/settings/audit-logs");
+      set({ auditLogs: list });
+    } catch (e) {
+      console.error("[settings] loadAuditLogs error:", e);
+    }
+  },
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
@@ -198,7 +377,13 @@ export const useStore = create<AppState>((set, get) => ({
   selectConversation: async (id) => {
     // 关闭旧 SSE
     if (sseSource) { sseSource.close(); sseSource = null; }
-    set({ currentConvId: id, messages: [] });
+    // 选择会话即强制回到聊天视图（退出自动化/专家等独立面板）
+    set({ currentConvId: id, messages: [], activeCategory: "assistant" });
+    // 确保该会话出现在侧边栏列表中（自动化等后台创建的会话需在选入时补进列表）
+    const { conversations } = get();
+    if (!conversations.find((c) => c.id === id)) {
+      get().loadConversations();
+    }
     try {
       const msgs = await apiGet<Message[]>("/api/msgs/" + id);
       set({ messages: msgs });
@@ -220,7 +405,7 @@ export const useStore = create<AppState>((set, get) => ({
   resetToWelcome: () => {
     // 关闭旧 SSE，回到起始页
     if (sseSource) { sseSource.close(); sseSource = null; }
-    set({ currentConvId: null, messages: [], composerWorkspaceId: null, busy: false });
+    set({ currentConvId: null, messages: [], composerWorkspaceId: null, busy: false, activeCategory: "assistant" });
   },
 
   deleteConversation: async (id) => {
@@ -410,6 +595,15 @@ function handleEvent(ev: any, set: any, get: any) {
         toolName: ev.toolName,
         args: ev.args,
         sessionId: ev.sessionId,
+      },
+    });
+  } else if (ev.type === "ask_user_question") {
+    // 后端发来交互式提问（AskUserQuestion），展示提问卡片
+    set({
+      pendingAsk: {
+        requestId: ev.requestId,
+        sessionId: ev.sessionId,
+        questions: ev.questions,
       },
     });
   }

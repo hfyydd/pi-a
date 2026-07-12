@@ -6,26 +6,42 @@ import ChatArea from "./components/ChatArea";
 import Composer from "./components/Composer";
 import WorkspaceModal from "./components/WorkspaceModal";
 import ToolConfirmDialog from "./components/ToolConfirmDialog";
+import AskUserQuestionDialog from "./components/AskUserQuestionDialog";
+import SettingsModal from "./components/SettingsModal";
+
+import AutomationPanel from "./components/AutomationPanel";
+import ExpertPanel from "./components/ExpertPanel";
 
 export default function App() {
-  const { sidebarCollapsed, loadWorkspaces, loadConversations } = useStore();
+  const { sidebarCollapsed, activeCategory, loadWorkspaces, loadConversations, loadSettings } = useStore();
 
   useEffect(() => {
     const t = initTheme();
     useStore.setState({ theme: t });
+    // 加载全局设置
+    loadSettings();
     // 先加载工作空间（确定 currentWorkspaceId），再加载该空间下的对话
     loadWorkspaces().then(() => loadConversations());
   }, []);
 
+  const isMac = navigator.userAgent.includes("Mac");
+
   return (
-    <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      {!sidebarCollapsed && <Sidebar />}
+    <div className={isMac ? "mac-window" : ""} style={{ display: "flex", height: "100%", overflow: "hidden" }}>
+      <Sidebar collapsed={sidebarCollapsed} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-        <ChatArea />
-        <Composer />
+        {activeCategory === "automation" ? <AutomationPanel /> :
+         activeCategory === "expert" ? <ExpertPanel /> : (
+          <>
+            <ChatArea />
+            <Composer />
+          </>
+        )}
       </div>
       <WorkspaceModal />
+      <SettingsModal />
       <ToolConfirmDialog />
+      <AskUserQuestionDialog />
     </div>
   );
 }

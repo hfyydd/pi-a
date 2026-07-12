@@ -5,10 +5,14 @@ import { getDb } from "../../../infra/db.ts";
 
 export type TriggerType = "cron" | "file_watch";
 export type ActionType = "prompt" | "skill";
+export type ScheduleType = "cron" | "interval" | "once";
 export type RunStatus = "inProgress" | "completed" | "failed";
+export type PermissionLevel = "readonly" | "default" | "full";
 
 export interface TriggerConfig {
-  cron?: string;        // "*/5 * * * *" 5 段：分 时 日 月 周
+  cron?: string;        // schedule_type=cron: "*/5 * * * *" 5 段
+  intervalMinutes?: number; // schedule_type=interval
+  onceAt?: number;      // schedule_type=once: Unix timestamp (ms)
   path?: string;        // file_watch: 监听目录
   pattern?: string;     // file_watch: 文件名 glob
 }
@@ -21,10 +25,19 @@ export interface Automation {
   id: string;
   name: string;
   enabled: boolean;
+  workspaceId: string | null;
   triggerType: TriggerType;
   triggerConfig: TriggerConfig;
   actionType: ActionType;
   actionConfig: ActionConfig;
+  prompt: string | null;
+  expertId: string | null;
+  permission: PermissionLevel;
+  connector: string | null;
+  scheduleType: ScheduleType;
+  validFrom: number | null;
+  validUntil: number | null;
+  pushToWxmp: boolean;
   lastRun: number | null;
   nextRun: number | null;
   createdAt: number;
@@ -47,10 +60,19 @@ function rowToAutomation(r: any): Automation {
     id: r.id,
     name: r.name,
     enabled: !!r.enabled,
+    workspaceId: r.workspace_id ?? null,
     triggerType: r.trigger_type,
     triggerConfig: JSON.parse(r.trigger_config || "{}"),
     actionType: r.action_type,
     actionConfig: JSON.parse(r.action_config || "{}"),
+    prompt: r.prompt ?? null,
+    expertId: r.expert_id ?? null,
+    permission: (r.permission || "default") as PermissionLevel,
+    connector: r.connector ?? null,
+    scheduleType: (r.schedule_type || "cron") as ScheduleType,
+    validFrom: r.valid_from ?? null,
+    validUntil: r.valid_until ?? null,
+    pushToWxmp: !!r.push_to_wxmp,
     lastRun: r.last_run ?? null,
     nextRun: r.next_run ?? null,
     createdAt: r.created_at,
@@ -70,23 +92,59 @@ export function getAutomation(id: string): Automation | null {
 
 export function createAutomation(a: {
   name: string;
+  workspaceId?: string | null;
   triggerType: TriggerType;
-  triggerConfig: TriggerConfig;
+  triggerConfig?: TriggerConfig;
   actionType: ActionType;
-  actionConfig: ActionConfig;
+  actionConfig?: ActionConfig;
+  prompt?: string;
+  expertId?: string | null;
+  permission?: PermissionLevel;
+  connector?: string | null;
+  scheduleType?: ScheduleType;
+  validFrom?: number | null;
+  validUntil?: number | null;
+  pushToWxmp?: boolean;
 }): Automation {
   const db = getDb();
   const id = uuid();
   const now = Date.now();
+  const triggerConfig = a.triggerConfig || {};
+  const actionConfig = a.actionConfig || {};
   db.prepare(
-    "INSERT INTO automations (id, name, enabled, trigger_type, trigger_config, action_type, action_config, last_run, next_run, created_at) VALUES (?, ?, 1, ?, ?, ?, ?, NULL, NULL, ?)",
-  ).run(id, a.name, a.triggerType, JSON.stringify(a.triggerConfig), a.actionType, JSON.stringify(a.actionConfig), now);
+    `INSERT INTO automations (
+      id, name, enabled, workspace_id, trigger_type, trigger_config, action_type, action_config,
+      prompt, expert_id, permission, connector, schedule_type, valid_from, valid_until, push_to_wxmp,
+      last_run, next_run, created_at
+    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+  ).run(
+    id,
+    a.name,
+    a.workspaceId ?? null,
+    a.triggerType,
+    JSON.stringify(triggerConfig),
+    a.actionType,
+    JSON.stringify(actionConfig),
+    a.prompt ?? null,
+    a.expertId ?? null,
+    a.permission ?? "default",
+    a.connector ?? null,
+    a.scheduleType ?? "cron",
+    a.validFrom ?? null,
+    a.validUntil ?? null,
+    a.pushToWxmp ? 1 : 0,
+    now,
+  );
   return getAutomation(id)!;
 }
 
 export function updateAutomation(id: string, patch: Partial<{
-  name: string; enabled: boolean; triggerType: TriggerType;
-  triggerConfig: TriggerConfig; actionType: ActionType; actionConfig: ActionConfig;
+  name: string; enabled: boolean; workspaceId: string | null;
+  triggerType: TriggerType; triggerConfig: TriggerConfig;
+  actionType: ActionType; actionConfig: ActionConfig;
+  prompt: string | null; expertId: string | null; permission: PermissionLevel;
+  connector: string | null; scheduleType: ScheduleType;
+  validFrom: number | null; validUntil: number | null; pushToWxmp: boolean;
   lastRun: number | null; nextRun: number | null;
 }>): void {
   const db = getDb();
@@ -95,16 +153,48 @@ export function updateAutomation(id: string, patch: Partial<{
   const merged = {
     name: patch.name ?? cur.name,
     enabled: patch.enabled ?? cur.enabled,
+    workspaceId: patch.workspaceId !== undefined ? patch.workspaceId : cur.workspaceId,
     triggerType: patch.triggerType ?? cur.triggerType,
     triggerConfig: patch.triggerConfig ?? cur.triggerConfig,
     actionType: patch.actionType ?? cur.actionType,
     actionConfig: patch.actionConfig ?? cur.actionConfig,
+    prompt: patch.prompt !== undefined ? patch.prompt : cur.prompt,
+    expertId: patch.expertId !== undefined ? patch.expertId : cur.expertId,
+    permission: patch.permission ?? cur.permission,
+    connector: patch.connector !== undefined ? patch.connector : cur.connector,
+    scheduleType: patch.scheduleType ?? cur.scheduleType,
+    validFrom: patch.validFrom !== undefined ? patch.validFrom : cur.validFrom,
+    validUntil: patch.validUntil !== undefined ? patch.validUntil : cur.validUntil,
+    pushToWxmp: patch.pushToWxmp ?? cur.pushToWxmp,
     lastRun: patch.lastRun ?? cur.lastRun,
     nextRun: patch.nextRun ?? cur.nextRun,
   };
   db.prepare(
-    "UPDATE automations SET name=?, enabled=?, trigger_type=?, trigger_config=?, action_type=?, action_config=?, last_run=?, next_run=? WHERE id=?",
-  ).run(merged.name, merged.enabled ? 1 : 0, merged.triggerType, JSON.stringify(merged.triggerConfig), merged.actionType, JSON.stringify(merged.actionConfig), merged.lastRun, merged.nextRun, id);
+    `UPDATE automations SET
+      name=?, enabled=?, workspace_id=?, trigger_type=?, trigger_config=?, action_type=?, action_config=?,
+      prompt=?, expert_id=?, permission=?, connector=?, schedule_type=?, valid_from=?, valid_until=?,
+      push_to_wxmp=?, last_run=?, next_run=?
+    WHERE id=?`,
+  ).run(
+    merged.name,
+    merged.enabled ? 1 : 0,
+    merged.workspaceId,
+    merged.triggerType,
+    JSON.stringify(merged.triggerConfig),
+    merged.actionType,
+    JSON.stringify(merged.actionConfig),
+    merged.prompt,
+    merged.expertId,
+    merged.permission,
+    merged.connector,
+    merged.scheduleType,
+    merged.validFrom,
+    merged.validUntil,
+    merged.pushToWxmp ? 1 : 0,
+    merged.lastRun,
+    merged.nextRun,
+    id,
+  );
 }
 
 export function deleteAutomation(id: string): void {
@@ -144,4 +234,16 @@ export function listDueAutomations(now: number): Automation[] {
 export function listEnabledCronAutomations(): Automation[] {
   const db = getDb();
   return (db.prepare("SELECT * FROM automations WHERE enabled=1 AND trigger_type='cron'").all() as any[]).map(rowToAutomation);
+}
+
+/** 列出所有启用的一次性自动化（once） */
+export function listEnabledOnceAutomations(): Automation[] {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM automations WHERE enabled=1 AND trigger_type='cron' AND schedule_type='once'").all() as any[]).map(rowToAutomation);
+}
+
+/** 列出所有启用的间隔自动化（interval） */
+export function listEnabledIntervalAutomations(): Automation[] {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM automations WHERE enabled=1 AND trigger_type='cron' AND schedule_type='interval'").all() as any[]).map(rowToAutomation);
 }

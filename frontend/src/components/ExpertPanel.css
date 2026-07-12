@@ -1,0 +1,1181 @@
+/* ExpertPanel.css — “专家·技能·连接器”板块的精细化样式对标 */
+
+.expert-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+/* ── 顶部控制栏 ── */
+.ep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.ep-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-subtle);
+  padding: 3px;
+  border-radius: var(--r-sm);
+}
+
+.ep-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: calc(var(--r-sm) - 1px);
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ep-tab-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.ep-tab-btn.active {
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.ep-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── 搜索框 ── */
+.ep-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ep-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.ep-search-input {
+  width: 220px;
+  height: 32px;
+  padding: 0 10px 0 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-subtle);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.ep-search-input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* ── 按钮类 ── */
+.ep-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.ep-btn-primary {
+  background: var(--brand-gradient);
+  color: #ffffff;
+  border: none;
+}
+
+.ep-btn-primary:hover {
+  opacity: 0.92;
+}
+
+.ep-btn-secondary {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+  color: var(--text-2);
+}
+
+.ep-btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ep-btn-secondary.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ep-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-active);
+  color: var(--text-2);
+  border-radius: 10px;
+  padding: 0 6px;
+  font-size: 11px;
+  height: 16px;
+  min-width: 16px;
+  margin-left: 2px;
+}
+
+.ep-btn-secondary.active .ep-badge {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ── 内容滚轴 ── */
+.ep-body {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.ep-tab-pane {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ep-pane-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ep-sub-title {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+/* ── 模块小节标题 ── */
+.ep-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 6px;
+}
+
+.ep-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.ep-shuffle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 12px;
+  transition: color 0.15s ease;
+}
+
+.ep-shuffle-btn:hover {
+  color: var(--accent);
+}
+
+.margin-top-lg {
+  margin-top: 28px;
+}
+
+/* ── 网格与卡片排版 ── */
+.ep-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.ep-card {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.ep-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ==================== 专家 TAB 样式 ==================== */
+.expert-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.expert-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 18px 16px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.expert-card:hover {
+  background: var(--bg-active);
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.expert-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.expert-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.expert-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.expert-name-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.expert-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.expert-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expert-badge-tag {
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-active);
+  border: 1px solid var(--border-soft);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.expert-nickname {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.expert-desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 38px;
+  margin: 2px 0;
+}
+
+.expert-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.expert-tag-pill {
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--bg-active);
+  border: 1px solid var(--border-soft);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.expert-card .expert-action-btn {
+  opacity: 0;
+  pointer-events: none;
+  background: #ffffff;
+  color: #111111;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.expert-card:hover .expert-action-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.expert-card .expert-action-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
+}
+
+/* ==================== 技能 TAB 样式 ==================== */
+.featured-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .featured-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.featured-card {
+  padding: 16px;
+  min-height: 120px;
+}
+
+.featured-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.skill-logo {
+  width: 32px;
+  height: 32px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skill-meta-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.skill-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.skill-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.skill-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 35px;
+}
+
+.status-tag {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.status-tag.enabled {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+
+.status-tag.disabled {
+  background: var(--red-soft);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+}
+
+/* 推荐套件卡片 */
+.hub-card {
+  padding: 14px;
+  justify-content: space-between;
+  min-height: 125px;
+}
+
+.hub-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hub-card-top .skill-title-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.hub-card-bottom {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.category-tag {
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--bg-hover);
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
+/* 一键安装按钮 */
+.install-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.install-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--text-2);
+}
+
+.install-icon-btn.installed {
+  background: var(--green);
+  border-color: var(--green);
+  color: #ffffff;
+}
+
+.install-icon-btn.installed:hover {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.install-icon-btn.installed:hover svg {
+  transform: rotate(45deg);
+}
+
+/* 二级子菜单选项 */
+.ep-sub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.ep-sub-tab-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 14px;
+  transition: all 0.15s ease;
+}
+
+.ep-sub-tab-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.ep-sub-tab-btn.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+/* ==================== “我安装的”管理列表 ==================== */
+.installed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.installed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  transition: border-color 0.2s;
+}
+
+.installed-item:hover {
+  border-color: var(--border-strong);
+}
+
+.installed-item.disabled-item {
+  opacity: 0.65;
+}
+
+.installed-item-main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 20px;
+}
+
+.installed-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.installed-item-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.installed-item-tag {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  background: var(--bg-active);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+}
+
+.builtin-tag {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  padding: 0 6px;
+  border-radius: 4px;
+}
+
+.installed-item-desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.installed-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ep-action-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.ep-action-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.ep-action-icon-btn.ep-action-danger:hover {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: var(--red-border);
+}
+
+/* ==================== Switch 开关样式 ==================== */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border-strong);
+  transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: .22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:checked + .slider {
+  background-color: var(--green);
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.slider.round {
+  border-radius: 20px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+/* ==================== 连接器 TAB 样式 ==================== */
+.connector-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.connector-card {
+  padding: 20px;
+  min-height: 180px;
+  justify-content: space-between;
+}
+
+.connector-card.enabled {
+  border-color: var(--accent-border);
+  background: linear-gradient(135deg, var(--bg-subtle), var(--accent-soft) 95%);
+}
+
+.connector-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.connector-icon {
+  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  background: var(--bg-active);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connector-card.enabled .connector-icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.connector-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.connector-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.45;
+  margin-bottom: 12px;
+  min-height: 35px;
+}
+
+.connector-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+
+.connector-setting-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+
+.connector-setting-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.connector-setting-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==================== 空状态 ==================== */
+.ep-empty-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  color: var(--text-4);
+  font-size: 13.5px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r);
+  background: var(--bg-subtle);
+  text-align: center;
+  padding: 20px;
+}
+
+/* ==================== 模态框 / 弹窗 ── 编辑技能 ==================== */
+.ep-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.ep-modal {
+  width: 680px;
+  max-width: 90vw;
+  height: 580px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modal-enter 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modal-enter {
+  from { transform: scale(0.95) translateY(12px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.ep-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.ep-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ep-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: all 0.15s;
+}
+
+.ep-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.ep-modal-body {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.form-group.flex-fill-grow {
+  flex: 1;
+  flex-shrink: 1;
+  min-height: 180px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.form-control {
+  border: 1px solid var(--border-strong);
+  background: var(--bg-subtle);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.form-control:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.form-control:disabled {
+  background: var(--bg-active);
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.textarea-body {
+  flex: 1;
+  resize: none;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.ep-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+/* ==================== MCP 连接器专属状态标签 ==================== */
+.connector-status-badge {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.mcp-status-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.mcp-status-tag.connected {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+
+.mcp-status-tag.disconnected {
+  background: var(--red-soft);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+}
+
+.mcp-status-tag.uninstalled {
+  background: var(--bg-hover);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+}
+
+/* ==================== MCP 服务管理模态框 ==================== */
+.mcp-modal {
+  width: 600px;
+  height: 520px;
+}
+
+.mcp-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.mcp-config-path-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.mcp-config-path-label span {
+  font-family: var(--mono);
+  background: var(--bg-active);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.mcp-error-alert {
+  background: var(--red-soft);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+}
+
+.mcp-json-textarea {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  resize: none;
+  line-height: 1.5;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--border-strong);
+}
+
+.mcp-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.mcp-list-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.mcp-servers-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 2px;
+}
+
+/* MCP 服务器条目 */
+.mcp-server-item {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mcp-server-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mcp-server-info-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.mcp-status-indicator.connected {
+  background-color: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
+.mcp-status-indicator.disconnected {
+  background-color: var(--text-4);
+}
+
+.mcp-server-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mcp-server-type-tag {
+  font-size: 10px;
+  background: var(--bg-active);
+  color: var(--text-3);
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.mcp-server-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.mcp-detail-row {
+  display: flex;
+  gap: 6px;
+}
+
+.mcp-detail-label {
+  color: var(--text-3);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.mcp-detail-value {
+  word-break: break-all;
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.mcp-tools-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mcp-tool-badge {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* MCP 空状态 */
+.mcp-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.mcp-empty-icon {
+  color: var(--text-4);
+  margin-bottom: 12px;
+}
+
+.mcp-empty-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+.mcp-empty-subtext {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-bottom: 16px;
+}
+

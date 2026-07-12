@@ -30,6 +30,7 @@ import { ensureSkillsDir } from "./src/agent/skills.ts";
 import { startScheduler } from "./src/domains/automation/node/scheduler.ts";
 import { ensureMcpConfig, connectAllMcpServers } from "./src/agent/mcp.ts";
 import { setMcpTools } from "./src/agent/tools/index.ts";
+import { resolvePendingAnswer, isPendingAnswer } from "./src/agent/interactive.ts";
 import {
   createConversation, listConversations, renameConversation,
   moveConversation, deleteConversation, appendMessage, getMessages,
@@ -39,12 +40,16 @@ import { createProject, listProjects, getProject, updateProject, deleteProject, 
 import { createWorkspace, listWorkspaces, getWorkspace, updateWorkspace, deleteWorkspace, touchWorkspace, listWorkspaceConversations, assignConversationToWorkspace } from "./src/domains/workspace/node/store.ts";
 import { BUILTIN_EXPERTS, getExpert } from "./src/agent/experts.ts";
 import { getApiKey } from "./src/infra/keychain.ts";
+import { getSetting, applyKeepAwake } from "./src/domains/settings/node/store.ts";
 
 initDb();
 initModels();
 ensureSkillsDir();
 ensureMcpConfig();
 startScheduler();
+
+// 初始化锁屏防睡眠状态
+applyKeepAwake(getSetting("keep_awake", "false") === "true");
 
 // 启动时自动注册所有已经配置了 API Key 的 Provider
 (async () => {
@@ -149,6 +154,11 @@ const pendingConfirms = new Map<string, (approved: boolean) => void>();
 /** 记录 token 用量到 DB */
 function logUsage(sessionId: string, message: any) {
   try {
+    const opt = getSetting("experience_opt", "true");
+    if (opt === "false") {
+      console.log("[privacy] 用户已退出体验优化计划，跳过记录用量日志");
+      return;
+    }
     const u = message?.usage;
     if (!u) return;
     const db = getDb();
@@ -324,7 +334,10 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const id = path.split("/")[3];
       const q = getQueue(id);
       // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
-      const events = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
+      const events = q.splice(0, q.length).filter((ev: any) =>
+        !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)) &&
+        !(ev.type === "ask_user_question" && !isPendingAnswer(ev.requestId))
+      );
       return json(events);
     }
     // GET /api/events/:id/stream — SSE 实时推送
@@ -342,7 +355,10 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           // 发送已有事件（队列里积攒的）
           const q = getQueue(id);
           // 过滤已 resolved（用户已响应/超时）的确认请求，避免切 chat 重连后重复弹已处理的确认框
-          const pending = q.splice(0, q.length).filter((ev: any) => !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)));
+          const pending = q.splice(0, q.length).filter((ev: any) =>
+            !(ev.type === "tool_confirmation" && !pendingConfirms.has(ev.requestId)) &&
+            !(ev.type === "ask_user_question" && !isPendingAnswer(ev.requestId))
+          );
           for (const ev of pending) {
             send(ev);
           }
@@ -381,6 +397,12 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const resolve = pendingConfirms.get(b.requestId);
       if (resolve) { pendingConfirms.delete(b.requestId); resolve(b.approved); }
       return json({ ok: true });
+    }
+    // POST /api/ask-answer  { requestId, answers } — 用户回答 AskUserQuestion
+    if (path === "/api/ask-answer" && req.method === "POST") {
+      const b = await req.json();
+      const ok = resolvePendingAnswer(b.requestId, b.answers);
+      return json({ ok });
     }
     // GET /api/artifacts — 列出所有工件
     if (path === "/api/artifacts" && req.method === "GET") {
@@ -434,10 +456,54 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const defaultProvider = getSetting("default_provider", "deepseek");
       const defaultModelId = getSetting("default_model_id", "deepseek-v4-flash");
       const docsDir = getSetting("docs_dir", "~/Desktop");
+      
+      const language = getSetting("language", "zh-CN");
+      const fontSize = getSetting("font_size", "14");
+      const autoUpdateSkills = getSetting("auto_update_skills", "true") === "true";
+      const autoInstallSkills = getSetting("auto_install_skills", "false") === "true";
+      const keepAwake = getSetting("keep_awake", "false") === "true";
+      const defaultWorkspaceDir = getSetting("default_workspace_dir", "~/WorkBuddy");
+      const experienceOpt = getSetting("experience_opt", "true") === "true";
+
+      const agentSystemPrompt = getSetting("agent_system_prompt", "你是一个有用、高效的本地桌面助理，随时帮我处理各种任务。");
+      const agentTemperature = getSetting("agent_temperature", "0.7");
+      const agentMaxTokens = getSetting("agent_max_tokens", "4096");
+      const searchEngine = getSetting("search_engine", "google");
+
+      const sandboxSecurity = getSetting("sandbox_security", "true") === "true";
+      const deletionProtection = getSetting("deletion_protection", "true") === "true";
+      const bulkDeletionLimit = getSetting("bulk_deletion_limit", "50");
+      const builtinRuntime = getSetting("builtin_runtime", "true") === "true";
+      const runtimePython = getSetting("runtime_python", "true") === "true";
+      const runtimeNodejs = getSetting("runtime_nodejs", "true") === "true";
+      const securityFileRules = getSetting("security_file_rules", JSON.stringify(["/Users/hanfeng/Desktop/pi-a", "/tmp"]));
+      const securityCommandRules = getSetting("security_command_rules", JSON.stringify(["git", "deno", "npm", "python"]));
+      const securityNetworkRules = getSetting("security_network_rules", JSON.stringify(["api.deepseek.com", "github.com", "deno.land"]));
+
       return json({
         defaultProvider,
         defaultModelId,
         docsDir,
+        language,
+        fontSize,
+        autoUpdateSkills,
+        autoInstallSkills,
+        keepAwake,
+        defaultWorkspaceDir,
+        experienceOpt,
+        agentSystemPrompt,
+        agentTemperature,
+        agentMaxTokens,
+        searchEngine,
+        sandboxSecurity,
+        deletionProtection,
+        bulkDeletionLimit,
+        builtinRuntime,
+        runtimePython,
+        runtimeNodejs,
+        securityFileRules,
+        securityCommandRules,
+        securityNetworkRules,
         providers: listAllProviders(),
         availableProviders: listAvailableProviders(),
       });
@@ -449,7 +515,41 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       if (b.defaultProvider) setSetting("default_provider", b.defaultProvider);
       if (b.defaultModelId) setSetting("default_model_id", b.defaultModelId);
       if (b.docsDir) setSetting("docs_dir", b.docsDir);
+      
+      if (b.language) setSetting("language", b.language);
+      if (b.fontSize) setSetting("font_size", b.fontSize);
+      if (b.autoUpdateSkills !== undefined) setSetting("auto_update_skills", b.autoUpdateSkills ? "true" : "false");
+      if (b.autoInstallSkills !== undefined) setSetting("auto_install_skills", b.autoInstallSkills ? "true" : "false");
+      if (b.keepAwake !== undefined) setSetting("keep_awake", b.keepAwake ? "true" : "false");
+      if (b.defaultWorkspaceDir) setSetting("default_workspace_dir", b.defaultWorkspaceDir);
+      if (b.experienceOpt !== undefined) setSetting("experience_opt", b.experienceOpt ? "true" : "false");
+
+      if (b.agentSystemPrompt !== undefined) setSetting("agent_system_prompt", b.agentSystemPrompt);
+      if (b.agentTemperature !== undefined) setSetting("agent_temperature", b.agentTemperature);
+      if (b.agentMaxTokens !== undefined) setSetting("agent_max_tokens", b.agentMaxTokens);
+      if (b.searchEngine !== undefined) setSetting("search_engine", b.searchEngine);
+
+      if (b.sandboxSecurity !== undefined) setSetting("sandbox_security", b.sandboxSecurity ? "true" : "false");
+      if (b.deletionProtection !== undefined) setSetting("deletion_protection", b.deletionProtection ? "true" : "false");
+      if (b.bulkDeletionLimit !== undefined) setSetting("bulk_deletion_limit", String(b.bulkDeletionLimit));
+      if (b.builtinRuntime !== undefined) setSetting("builtin_runtime", b.builtinRuntime ? "true" : "false");
+      if (b.runtimePython !== undefined) setSetting("runtime_python", b.runtimePython ? "true" : "false");
+      if (b.runtimeNodejs !== undefined) setSetting("runtime_nodejs", b.runtimeNodejs ? "true" : "false");
+      if (b.securityFileRules !== undefined) setSetting("security_file_rules", b.securityFileRules);
+      if (b.securityCommandRules !== undefined) setSetting("security_command_rules", b.securityCommandRules);
+      if (b.securityNetworkRules !== undefined) setSetting("security_network_rules", b.securityNetworkRules);
+
       return json({ ok: true });
+    }
+    // GET /api/settings/audit-logs — 获取安全中心审计日志
+    if (path === "/api/settings/audit-logs" && req.method === "GET") {
+      try {
+        const db = getDb();
+        const logs = db.prepare("SELECT id, tool_name as toolName, args, is_error as isError, created_at as createdAt FROM tool_audit_log ORDER BY id DESC LIMIT 50").all();
+        return json(logs);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { "content-type": "application/json" } });
+      }
     }
     // GET /api/settings/keys — 获取已存 API Keys 的 Provider 状态
     if (path === "/api/settings/keys" && req.method === "GET") {
@@ -504,24 +604,24 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const { listSkills } = await import("./src/domains/skill/node/store.ts");
       return json(await listSkills());
     }
-    // POST /api/skills — 新建技能 { name, description, body }
+    // POST /api/skills — 新建技能 { name, description, disabled, body, displayName }
     if (path === "/api/skills" && req.method === "POST") {
       const b = await req.json();
       const { saveSkill } = await import("./src/domains/skill/node/store.ts");
       try {
-        const skill = await saveSkill(b.name, b.description || "", b.body || "");
+        const skill = await saveSkill(b.name, b.description || "", !!b.disabled, b.body || "", b.displayName || b.name);
         return json(skill);
       } catch (e) {
         return json({ error: (e as Error).message });
       }
     }
-    // PUT /api/skills/:name — 编辑技能 { description, body }
+    // PUT /api/skills/:name — 编辑技能 { description, disabled, body, displayName }
     if (path.match(/^\/api\/skills\/[^/]+$/) && req.method === "PUT") {
       const name = path.split("/")[3];
       const b = await req.json();
       const { saveSkill } = await import("./src/domains/skill/node/store.ts");
       try {
-        const skill = await saveSkill(name, b.description || "", b.body || "");
+        const skill = await saveSkill(name, b.description || "", !!b.disabled, b.body || "", b.displayName || name);
         return json(skill);
       } catch (e) {
         return json({ error: (e as Error).message });
@@ -544,32 +644,26 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const { listAutomations } = await import("./src/domains/automation/node/store.ts");
       return json(listAutomations());
     }
-    // POST /api/automations — 新建 { name, triggerType, triggerConfig, actionType, actionConfig }
+    // POST /api/automations — 新建 { name, workspaceId, triggerType, triggerConfig, actionType, actionConfig, prompt, expertId, permission, connector, scheduleType, validFrom, validUntil, pushToWxmp }
     if (path === "/api/automations" && req.method === "POST") {
       const b = await req.json();
       const { createAutomation, updateAutomation, getAutomation } = await import("./src/domains/automation/node/store.ts");
-      const { nextCronTime } = await import("./src/domains/automation/node/scheduler.ts");
+      const { initAutomationNextRun } = await import("./src/domains/automation/node/scheduler.ts");
       const a = createAutomation(b);
-      if (a.triggerType === "cron" && a.triggerConfig.cron) {
-        const nt = nextCronTime(a.triggerConfig.cron, new Date());
-        if (nt) updateAutomation(a.id, { nextRun: nt.getTime() });
-      }
+      initAutomationNextRun(a);
       return json(getAutomation(a.id));
     }
-    // PUT /api/automations/:id — 更新（name/enabled/trigger/action 等）
+    // PUT /api/automations/:id — 更新
     if (path.match(/^\/api\/automations\/[^/]+$/) && !path.endsWith("/runs") && !path.endsWith("/run") && req.method === "PUT") {
       const id = path.split("/")[3];
       const b = await req.json();
       const { updateAutomation, getAutomation } = await import("./src/domains/automation/node/store.ts");
-      const { nextCronTime } = await import("./src/domains/automation/node/scheduler.ts");
+      const { initAutomationNextRun } = await import("./src/domains/automation/node/scheduler.ts");
       updateAutomation(id, b);
-      // 更新后重算 next_run
       const a = getAutomation(id);
-      if (a && a.enabled && a.triggerType === "cron" && a.triggerConfig.cron) {
-        const nt = nextCronTime(a.triggerConfig.cron, new Date());
-        updateAutomation(id, { nextRun: nt ? nt.getTime() : null });
-      } else if (a && (!a.enabled || a.triggerType !== "cron")) {
-        updateAutomation(id, { nextRun: null });
+      if (a) {
+        if (a.enabled && a.triggerType === "cron") initAutomationNextRun(a);
+        else updateAutomation(id, { nextRun: null });
       }
       return json(getAutomation(id));
     }
@@ -589,22 +683,13 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
     // POST /api/automations/:id/run — 手动触发一次
     if (path.match(/^\/api\/automations\/[^/]+\/run$/) && req.method === "POST") {
       const id = path.split("/")[3];
-      const { getAutomation, createRun, finishRun } = await import("./src/domains/automation/node/store.ts");
+      const { getAutomation, createRun } = await import("./src/domains/automation/node/store.ts");
       const a = getAutomation(id);
       if (!a) return json({ error: "自动化不存在" });
-      const prompt = a.actionType === "skill"
-        ? `【执行技能】${a.actionConfig.skill || ""}`
-        : (a.actionConfig.prompt || "");
-      const conv = createConversation(`[自动] ${a.name}`, "automation");
+      const conv = createConversation(`[自动] ${a.name}`, "automation", a.workspaceId ?? undefined);
       const run = createRun(a.id, conv.id);
-      (async () => {
-        try {
-          await provider.prompt(conv.id, prompt, { mode: "craft", permission: "default" });
-          finishRun(run.id, "completed", "手动触发已执行");
-        } catch (e) {
-          finishRun(run.id, "failed", (e as Error).message);
-        }
-      })();
+      const { runAutomationWithPersistence } = await import("./src/domains/automation/node/scheduler.ts");
+      runAutomationWithPersistence(a, conv.id, run.id);
       return json({ ok: true, runId: run.id, sessionId: conv.id });
     }
     // ===== 文件快照 API（功能17） =====
@@ -917,7 +1002,9 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
 }
 
 if (import.meta.main) {
-  const httpServer = Deno.serve({ port: 0 }, async (req) => {
+  // 后端端口固定（默认 8000），便于 Vite dev server 把 /api 代理过来
+  const servePortNum = Number(Deno.env.get("PI_A_PORT") || 8000);
+  const httpServer = Deno.serve({ port: servePortNum }, async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
     if (path.startsWith("/api/")) {
@@ -943,18 +1030,50 @@ if (import.meta.main) {
   const servePort = (httpServer.addr as any).port;
   const serveUrl = `http://127.0.0.1:${servePort}/`;
 
+  // 开发模式（PI_A_DEV_FRONTEND=1）：桌面窗口直接加载 Vite dev server（5173），
+  // 前端改动经 Vite HMR 秒级生效；API 请求由 Vite 代理回本后端端口。
+  // 生产/打包模式走内嵌前端（serveUrl），行为不变。
+  const DEV_FRONTEND = Deno.env.get("PI_A_DEV_FRONTEND") === "1";
+  const frontendUrl = DEV_FRONTEND ? "http://127.0.0.1:5173" : serveUrl;
+
   // ===== BrowserWindow =====
   const _Deno = Deno as any;
   let win: any = null;
   if (_Deno.BrowserWindow) {
-    win = new _Deno.BrowserWindow({
-      width: 1280,
-      height: 820,
-      minWidth: 960,
-      minHeight: 640,
-      title: "Pi-a",
-      url: serveUrl,
-    });
+    // Deno Desktop 限制：第一个窗口（隐式启动的窗口）会忽略 transparentTitlebar 等创建期配置。
+    // 为了使透明标题栏在 macOS 上生效，我们先采用并创建一个位于屏幕外的 0x0 占位窗口（不调用 hide() 以防触发 webview 挂起），
+    // 然后创建一个崭新的第二个窗口作为主窗口，并显式调用 navigate() 保证加载成功。
+    try {
+      const _firstWin = new _Deno.BrowserWindow({ width: 0, height: 0, x: -9999, y: -9999 });
+    } catch (e) {
+      console.warn("[main] 创建占位窗口失败:", e);
+    }
+
+    try {
+      win = new _Deno.BrowserWindow({
+        width: 1280,
+        height: 820,
+        minWidth: 960,
+        minHeight: 640,
+        title: "Pi-a",
+        url: frontendUrl,
+        transparentTitlebar: true,
+      });
+      try {
+        win.navigate(frontendUrl);
+      } catch (e) {
+        console.warn("[main] 显式导航主窗口失败:", e);
+      }
+      try {
+        win.openDevtools();
+      } catch (e) {
+        console.warn("[main] 开启 DevTools 失败:", e);
+      }
+    } catch (e) {
+      // 窗口创建失败（如无显示环境 / webview 初始化异常）不应拖垮后端服务
+      console.warn("[main] 创建主窗口失败，后端继续运行:", e);
+      win = null;
+    }
   } else {
     console.log("[main] 未检测到 Deno Desktop 运行时，跳过窗口创建。");
   }

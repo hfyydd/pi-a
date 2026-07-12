@@ -100,7 +100,7 @@ html, body, #root { height: 100%; }
 body {
   font-family: var(--font);
   background: var(--bg); color: var(--text);
-  font-size: 14px; line-height: 1.6;
+  font-size: var(--app-font-size, 14px); line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }

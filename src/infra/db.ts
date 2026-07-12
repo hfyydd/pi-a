@@ -135,10 +135,19 @@ export function initDb(): DatabaseSync {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       enabled INTEGER DEFAULT 1,
+      workspace_id TEXT,
       trigger_type TEXT NOT NULL,
       trigger_config TEXT NOT NULL,
       action_type TEXT NOT NULL,
       action_config TEXT NOT NULL,
+      prompt TEXT,
+      expert_id TEXT,
+      permission TEXT DEFAULT 'default',
+      connector TEXT,
+      schedule_type TEXT DEFAULT 'cron',
+      valid_from INTEGER,
+      valid_until INTEGER,
+      push_to_wxmp INTEGER DEFAULT 0,
       last_run INTEGER,
       next_run INTEGER,
       created_at INTEGER NOT NULL
@@ -203,10 +212,21 @@ export function initDb(): DatabaseSync {
   // 补 messages.parent_id 列（会话分叉：记录消息树形父节点）
   addColumn("messages", "parent_id", "TEXT");
 
-  // 兼容旧库：补 category 列（已存在则跳过）
+  // 补 conversations.category 列（已存在则跳过）
   addColumn("conversations", "category", "TEXT NOT NULL DEFAULT 'assistant'");
   // 补 status 列（会话状态：idle/running/done/failed/pending/planning）
   addColumn("conversations", "status", "TEXT NOT NULL DEFAULT 'idle'");
+
+  // 补 automations 新字段（自动化 V2）
+  addColumn("automations", "workspace_id", "TEXT");
+  addColumn("automations", "prompt", "TEXT");
+  addColumn("automations", "expert_id", "TEXT");
+  addColumn("automations", "permission", "TEXT DEFAULT 'default'");
+  addColumn("automations", "connector", "TEXT");
+  addColumn("automations", "schedule_type", "TEXT DEFAULT 'cron'");
+  addColumn("automations", "valid_from", "INTEGER");
+  addColumn("automations", "valid_until", "INTEGER");
+  addColumn("automations", "push_to_wxmp", "INTEGER DEFAULT 0");
 
   console.log(`[db] 已初始化: ${DB_PATH}`);
   return db;

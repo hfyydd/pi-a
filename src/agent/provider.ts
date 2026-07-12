@@ -88,13 +88,12 @@ export class LocalPiProvider implements AgentProvider {
       const db = getDb();
       const conv = db.prepare("SELECT model_provider, model_id, expert_id FROM conversations WHERE id = ?").get(sessionId) as { model_provider: string; model_id: string; expert_id?: string } | undefined;
 
-      // 如果有专家，加载专家的 system prompt
+      // 如果有专家，加载专家的 system prompt (支持网络置换 + 本地缓存)
       let expertPrompt: string | undefined;
       if (conv?.expert_id) {
         try {
-          const { getExpert } = await import("./experts.ts");
-          const expert = getExpert(conv.expert_id);
-          if (expert) expertPrompt = expert.systemPrompt;
+          const { getExpertSystemPrompt } = await import("./experts.ts");
+          expertPrompt = await getExpertSystemPrompt(conv.expert_id);
         } catch {}
       }
 
@@ -212,6 +211,43 @@ export class LocalPiProvider implements AgentProvider {
   }
 
   /**
+   * 为某会话挂接「消息落库」监听器：把 agent 的 message_end（assistant 文本）
+   * 与 tool_execution_end（工具调用）持久化进 SQLite。
+   * 正常聊天由 main.ts 的 getQueue 负责落库（同时进轮询队列）；
+   * 自动化触发没有前端连接，需后端自行挂接，确保「查看会话」显示真实对话。
+   * @returns 取消订阅函数
+   */
+  async attachPersistence(sessionId: string): Promise<() => void> {
+    const entry = await this.ensureSession(sessionId);
+    const toolArgs = new Map<string, string>();
+    const cb = (event: any) => {
+      try {
+        if (event.type === "tool_execution_start") {
+          const toolCallId = event.toolCallId;
+          const args = event.args;
+          if (toolCallId && args) toolArgs.set(toolCallId, typeof args === "string" ? args : JSON.stringify(args));
+        } else if (event.type === "message_end" && event.message?.role === "assistant") {
+          const text = (event.message.content ?? [])
+            .filter((c: any) => c.type === "text")
+            .map((c: any) => c.text)
+            .join("");
+          if (text) appendMessage(sessionId, "assistant", text);
+        } else if (event.type === "tool_execution_end") {
+          const toolCallId = event.toolCallId;
+          const argsStr = toolCallId ? toolArgs.get(toolCallId) : undefined;
+          if (toolCallId) toolArgs.delete(toolCallId);
+          const outputStr = getToolOutputString(event.output);
+          if (outputStr) appendMessage(sessionId, "tool", outputStr, { toolName: event.toolName, toolArgs: argsStr, isError: event.isError });
+        }
+      } catch (e) {
+        console.error("[provider] 消息持久化异常:", e);
+      }
+    };
+    entry.listeners.add(cb);
+    return () => entry.listeners.delete(cb);
+  }
+
+  /**
    * 向某会话广播一个事件（供外部注入非 agent 事件，如工具确认请求 tool_confirmation）。
    * 与 createWorkBuddyAgent 的事件回调走同一条 listeners 通路，
    * 因此 SSE（onEvent 订阅）与 getQueue（onEvent → push queue）都能实时收到。
@@ -236,6 +272,21 @@ export class LocalPiProvider implements AgentProvider {
       console.log(`[provider] 销毁会话 ${sessionId}`);
     }
   }
+}
+
+/** 把工具输出规整为可存储的字符串（与 main.ts 的 getToolOutputString 同逻辑） */
+function getToolOutputString(output: unknown): string {
+  if (!output) return "";
+  if (typeof output === "string") return output;
+  const anyOutput = output as any;
+  if (Array.isArray(anyOutput.content)) {
+    return anyOutput.content
+      .filter((c: any) => c.type === "text")
+      .map((c: any) => c.text)
+      .join("\n");
+  }
+  if (typeof anyOutput.text === "string") return anyOutput.text;
+  return JSON.stringify(output);
 }
 
 /** MVP 唯一的 provider 实例 */
