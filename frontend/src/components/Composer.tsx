@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useStore, type RunMode, type PermLevel } from "../store/useStore";
-import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Zap, Shield, Lock } from "lucide-react";
+import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, Zap, Shield } from "lucide-react";
 
 interface CombinedOption {
   key: string;
