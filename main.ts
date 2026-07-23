@@ -1207,13 +1207,12 @@ if (import.meta.main) {
     }
   }
 
-  // 窗口关闭按钮 → 最小化到托盘（不退出）
-  // deno desktop 的 closeRequested 事件：preventDefault 阻止关闭，hide 隐藏到托盘
+  // 窗口关闭按钮 → 彻底退出程序
   try {
     if (win) {
-      win.addEventListener("closeRequested", (e: any) => {
-        try { e.preventDefault(); } catch {}
-        try { win.hide(); } catch {}
+      win.addEventListener("closeRequested", () => {
+        console.log("[main] 用户点击窗口关闭按钮，直接退出程序");
+        try { Deno.exit(0); } catch {}
       });
     }
   } catch {}
