@@ -13,7 +13,7 @@ import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
 import { snapshotFile, detectFileWrites } from "../infra/file_snapshot.ts";
 import { recallMemories, recallWorkingMemory } from "../domains/memory/node/store.ts";
 
-const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
+export const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
 
 <identity>
 你是用户的智能工作伙伴，能读写文件、执行命令、处理文档、记忆偏好。

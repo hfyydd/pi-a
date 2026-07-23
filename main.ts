@@ -38,6 +38,10 @@ import {
 import { listArtifacts, deleteArtifact } from "./src/domains/artifact/node/store.ts";
 import { createProject, listProjects, getProject, updateProject, deleteProject, assignConversationToProject, listProjectConversations } from "./src/domains/project/node/store.ts";
 import { createWorkspace, listWorkspaces, getWorkspace, updateWorkspace, deleteWorkspace, touchWorkspace, listWorkspaceConversations, assignConversationToWorkspace } from "./src/domains/workspace/node/store.ts";
+import { SidecarManager } from "./src/infra/sidecar_manager.ts";
+
+// 启动 Sidecar 隔离进程
+SidecarManager.getInstance().start();
 import { BUILTIN_EXPERTS, getExpert } from "./src/agent/experts.ts";
 import { getApiKey } from "./src/infra/keychain.ts";
 import { getSetting, applyKeepAwake } from "./src/domains/settings/node/store.ts";
@@ -874,6 +878,16 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         return json({ error: (e as Error).message });
       }
     }
+    // GET /api/system/sidecar — 查询 Sidecar 进程状态与日志
+    if (path === "/api/system/sidecar" && req.method === "GET") {
+      const mgr = SidecarManager.getInstance();
+      return json({
+        ready: mgr.isReady(),
+        port: mgr.getPort(),
+        logs: mgr.getLogs(),
+      });
+    }
+
     // GET /api/system/context — 获取当前前台应用名及选中内容
     if (path === "/api/system/context" && req.method === "GET") {
       let app = "";
