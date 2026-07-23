@@ -64,12 +64,12 @@ export default function Composer() {
 
   return (
     <div style={{ flexShrink: 0, padding: "8px 28px 16px", background: "linear-gradient(to top, var(--bg) 65%, transparent)" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ maxWidth: 760, margin: "0 auto", position: "relative" }}>
         {/* ── 输入框 + 工具栏（始终显示）── */}
         <div style={{
           background: "var(--bg)", border: "1px solid var(--border-strong)",
           borderRadius: 16, boxShadow: "var(--shadow-md)",
-          display: "flex", flexDirection: "column", overflow: "hidden",
+          display: "flex", flexDirection: "column", position: "relative",
         }}>
           {runningSubAgent && (
             <div style={{
@@ -151,24 +151,24 @@ export default function Composer() {
                   <PermIcon perm={permission} /> {PERM_LABELS[permission]}
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
-                {showPermMenu && (
-                  <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
-                    {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
-                      <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
-                        style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                        <span><PermIcon perm={p} size={15} /></span>
-                        <div>
-                          <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                            {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
-                          </div>
+              {showPermMenu && (
+                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
+                  {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
+                    <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
+                      style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                      <span><PermIcon perm={p} size={15} /></span>
+                      <div>
+                        <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+                          {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
+              )}
               </div>
             )}
 
@@ -232,7 +232,7 @@ export default function Composer() {
                 <ChevronDown size={11} />
               </button>
               {showPermMenu && (
-                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
+                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
                   {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
