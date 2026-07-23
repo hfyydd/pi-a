@@ -50,6 +50,18 @@ export default function Composer() {
   const [showModeMenu, setShowModeMenu] = useState(false);
   const [showWsPicker, setShowWsPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showModeMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) {
+        setShowModeMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showModeMenu]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -128,7 +140,7 @@ export default function Composer() {
             </button>
 
             {/* 合并后的单一下拉框（模式与权限一体） */}
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative" }} ref={modeMenuRef}>
               <button onClick={() => setShowModeMenu(!showModeMenu)}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 9px",
