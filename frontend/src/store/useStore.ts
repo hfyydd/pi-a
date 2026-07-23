@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { apiGet, apiPost, apiPut, apiDelete } from "../api/client";
 
 export type RunMode = "ask" | "plan" | "craft";
-export type PermLevel = "readonly" | "default" | "full";
+export type PermLevel = "L1" | "L2" | "L3" | "readonly" | "default" | "full";
 export type Theme = "light" | "dark";
 
 export interface Conversation {

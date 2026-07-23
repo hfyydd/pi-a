@@ -4,6 +4,7 @@ import "./ChatArea.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import ToolConfirmDialog from "./ToolConfirmDialog";
+import { getRandomTip } from "../utils/loadingTips";
 import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2, Copy, ThumbsUp, ThumbsDown, Volume2, Share2 } from "lucide-react";
 
 

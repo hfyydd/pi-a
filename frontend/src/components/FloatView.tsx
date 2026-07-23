@@ -1,6 +1,6 @@
 // frontend/src/components/FloatView.tsx — 速唤浮窗组件
 import { useState, useEffect, useRef } from "react";
-import { Send, CornerDownLeft, ExternalLink, X, Zap, Sparkles } from "lucide-react";
+import { Send, ExternalLink, X, Zap, Sparkles } from "lucide-react";
 import "./FloatView.css";
 
 export default function FloatView() {

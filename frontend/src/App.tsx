@@ -5,7 +5,6 @@ import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import Composer from "./components/Composer";
 import WorkspaceModal from "./components/WorkspaceModal";
-import ToolConfirmDialog from "./components/ToolConfirmDialog";
 import AskUserQuestionDialog from "./components/AskUserQuestionDialog";
 import SettingsModal from "./components/SettingsModal";
 
