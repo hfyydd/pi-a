@@ -4,12 +4,12 @@ import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles
 
 const MODE_LABELS: Record<RunMode, string> = { ask: "Ask", plan: "Plan", craft: "Craft" };
 const PERM_LABELS: Record<string, string> = {
-  L1: "L1 只读 🟢",
-  L2: "L2 标准 🟡",
-  L3: "L3 完全 🔴",
-  readonly: "L1 只读 🟢",
-  default: "L2 标准 🟡",
-  full: "L3 完全 🔴",
+  readonly: "只读模式",
+  default: "写需确认",
+  full: "自动运行",
+  L1: "只读模式",
+  L2: "写需确认",
+  L3: "自动运行",
 };
 
 function ModeIcon({ mode, size = 13 }: { mode: RunMode; size?: number }) {
@@ -153,7 +153,7 @@ export default function Composer() {
                 </button>
               {showPermMenu && (
                 <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
-                  {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
+                  {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
@@ -162,7 +162,7 @@ export default function Composer() {
                       <div>
                         <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
                         <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                          {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
+                          {p === "readonly" ? "只读不修改文件，完全防护" : p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
                         </div>
                       </div>
                     </div>
@@ -233,7 +233,7 @@ export default function Composer() {
               </button>
               {showPermMenu && (
                 <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
-                  {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
+                  {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
@@ -242,7 +242,7 @@ export default function Composer() {
                       <div>
                         <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
                         <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                          {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
+                          {p === "readonly" ? "只读不修改文件，完全防护" : p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
                         </div>
                       </div>
                     </div>
