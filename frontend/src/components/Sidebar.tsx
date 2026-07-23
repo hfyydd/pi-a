@@ -10,8 +10,9 @@ import { WorkspaceIcon } from "./WorkspaceIcon";
 import { t } from "../utils/i18n";
 
 const CATEGORIES = [
-  { id: "expert", labelKey: "experts_skills", icon: Star, color: "var(--cat-c)", enabled: true },
-  { id: "automation", labelKey: "automation", icon: Cog, color: "var(--cat-u)", enabled: true },
+  { id: "assistant", labelKey: "assistant_mode", labelFallback: "💬 对话", icon: Star, color: "var(--cat-p)", enabled: true },
+  { id: "expert", labelKey: "experts_skills", labelFallback: "🎓 专家", icon: Star, color: "var(--cat-c)", enabled: true },
+  { id: "automation", labelKey: "automation", labelFallback: "🤖 自动化", icon: Cog, color: "var(--cat-u)", enabled: true },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
