@@ -888,6 +888,14 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       });
     }
 
+    // POST /api/system/exit — 强制退出程序
+    if (path === "/api/system/exit" && req.method === "POST") {
+      setTimeout(() => {
+        try { Deno.exit(0); } catch {}
+      }, 100);
+      return json({ success: true });
+    }
+
     // GET /api/system/context — 获取当前前台应用名及选中内容
     if (path === "/api/system/context" && req.method === "GET") {
       let app = "";
@@ -1210,10 +1218,13 @@ if (import.meta.main) {
   // 窗口关闭按钮 → 彻底退出程序
   try {
     if (win) {
-      win.addEventListener("closeRequested", () => {
+      const exitFn = () => {
         console.log("[main] 用户点击窗口关闭按钮，直接退出程序");
         try { Deno.exit(0); } catch {}
-      });
+      };
+      win.addEventListener("closeRequested", exitFn);
+      win.addEventListener("close", exitFn);
+      win.addEventListener("closed", exitFn);
     }
   } catch {}
 

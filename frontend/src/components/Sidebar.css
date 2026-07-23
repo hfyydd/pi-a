@@ -48,6 +48,7 @@
   padding: 10px 10px 8px 12px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-soft);
+  -webkit-app-region: drag;
 }
 
 .sidebar-top-row {
@@ -59,7 +60,10 @@
 
 .sidebar-traffic-lights-spacer {
   width: 68px; /* 适配 macOS 交通灯宽度 */
+  height: 100%;
   flex-shrink: 0;
+  pointer-events: none;
+  -webkit-app-region: drag;
 }
 
 .sidebar-top-actions {
@@ -67,6 +71,7 @@
   align-items: center;
   gap: 4px;
   margin-left: auto;
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-icon-btn {
@@ -74,6 +79,8 @@
   border-radius: 6px; color: var(--text-3); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all .12s;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
 .sidebar-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 .sidebar-icon-btn.active {
