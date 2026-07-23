@@ -122,16 +122,24 @@ export default function Composer() {
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               {showModeMenu && (
-                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
+                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 5, minWidth: 220, zIndex: 99999 }}>
                   {(["ask", "plan", "craft"] as RunMode[]).map((m) => (
-                    <div key={m} onClick={() => { setMode(m); setShowModeMenu(false); }}
+                    <div key={m} onClick={() => {
+                      setMode(m);
+                      if (m === "ask" || m === "plan") {
+                        setPermission("readonly");
+                      } else if (permission === "readonly") {
+                        setPermission("default");
+                      }
+                      setShowModeMenu(false);
+                    }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                       <span><ModeIcon mode={m} size={15} /></span>
                       <div>
                         <div style={{ fontSize: "12.5px", fontWeight: 550, color: m === mode ? "var(--accent)" : "var(--text)" }}>{MODE_LABELS[m]} 模式</div>
-                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{m === "ask" ? "仅问答，不调用任何工具" : m === "plan" ? "先出方案，确认后再执行" : "直接执行，边做边改"}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{m === "ask" ? "仅问答，自动只读不调工具" : m === "plan" ? "先出方案，确认后再执行" : "动手改代码，边做边测"}</div>
                       </div>
                     </div>
                   ))}
@@ -139,8 +147,8 @@ export default function Composer() {
               )}
             </div>
 
-            {/* 权限切换（对话中才在工具栏内显示；无会话时移到下方行） */}
-            {!showBottomBar && (
+            {/* 权限切换（仅 Craft 动手模式下才需弹窗选择：写需确认 vs 自动运行） */}
+            {mode === "craft" && (
               <div style={{ position: "relative" }}>
                 <button onClick={() => { setShowPermMenu(!showPermMenu); setShowModeMenu(false); }}
                   style={{
@@ -153,7 +161,7 @@ export default function Composer() {
                 </button>
               {showPermMenu && (
                 <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
-                  {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
+                  {(["default", "full"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
@@ -162,7 +170,7 @@ export default function Composer() {
                       <div>
                         <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
                         <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                          {p === "readonly" ? "只读不修改文件，完全防护" : p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
+                          {p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
                         </div>
                       </div>
                     </div>
@@ -218,38 +226,41 @@ export default function Composer() {
               onManage={() => { setShowWsPicker(false); setShowWorkspaceManager(true); }}
             />
 
-            <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px" }} />
-
-            {/* 权限选择 */}
-            <div style={{ position: "relative" }}>
-              <button onClick={() => { setShowPermMenu(!showPermMenu); setShowModeMenu(false); }}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px",
-                  border: "1px solid transparent", borderRadius: 7, background: "transparent",
-                  color: permission === "full" ? "var(--accent)" : "var(--text-2)", fontSize: 12, fontWeight: 500,
-                }}>
-                <PermIcon perm={permission} /> {PERM_LABELS[permission]}
-                <ChevronDown size={11} />
-              </button>
-              {showPermMenu && (
-                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
-                  {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
-                    <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
-                      style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                      <span><PermIcon perm={p} size={15} /></span>
-                      <div>
-                        <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                          {p === "readonly" ? "只读不修改文件，完全防护" : p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
+            {/* 权限选择（仅 Craft 模式时需要暴露） */}
+            {mode === "craft" && (
+              <>
+                <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 8px" }} />
+                <div style={{ position: "relative" }}>
+                  <button onClick={() => { setShowPermMenu(!showPermMenu); setShowModeMenu(false); }}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px",
+                      border: "1px solid transparent", borderRadius: 7, background: "transparent",
+                      color: permission === "full" ? "var(--accent)" : "var(--text-2)", fontSize: 12, fontWeight: 500,
+                    }}>
+                    <PermIcon perm={permission} /> {PERM_LABELS[permission]}
+                    <ChevronDown size={11} />
+                  </button>
+                  {showPermMenu && (
+                    <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
+                      {(["default", "full"] as PermLevel[]).map((p) => (
+                        <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
+                          style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                          <span><PermIcon perm={p} size={15} /></span>
+                          <div>
+                            <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+                              {p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
 
