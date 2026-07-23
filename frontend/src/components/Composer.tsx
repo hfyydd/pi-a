@@ -3,7 +3,14 @@ import { useStore, type RunMode, type PermLevel } from "../store/useStore";
 import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Lock, Shield, Zap } from "lucide-react";
 
 const MODE_LABELS: Record<RunMode, string> = { ask: "Ask", plan: "Plan", craft: "Craft" };
-const PERM_LABELS: Record<PermLevel, string> = { readonly: "仅阅读", default: "默认权限", full: "完全访问" };
+const PERM_LABELS: Record<string, string> = {
+  L1: "L1 只读 🟢",
+  L2: "L2 标准 🟡",
+  L3: "L3 完全 🔴",
+  readonly: "L1 只读 🟢",
+  default: "L2 标准 🟡",
+  full: "L3 完全 🔴",
+};
 
 function ModeIcon({ mode, size = 13 }: { mode: RunMode; size?: number }) {
   if (mode === "ask") return <MessageSquare size={size} />;
@@ -12,8 +19,8 @@ function ModeIcon({ mode, size = 13 }: { mode: RunMode; size?: number }) {
 }
 
 function PermIcon({ perm, size = 13 }: { perm: PermLevel; size?: number }) {
-  if (perm === "readonly") return <Lock size={size} />;
-  if (perm === "full") return <Zap size={size} />;
+  if (perm === "readonly" || perm === "L1") return <Lock size={size} />;
+  if (perm === "full" || perm === "L3") return <Zap size={size} />;
   return <Shield size={size} />;
 }
 
@@ -145,8 +152,8 @@ export default function Composer() {
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
                 {showPermMenu && (
-                  <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
-                    {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
+                  <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
+                    {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
                       <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                         style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                         onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
@@ -154,7 +161,9 @@ export default function Composer() {
                         <span><PermIcon perm={p} size={15} /></span>
                         <div>
                           <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
-                          <div style={{ fontSize: 11, color: "var(--text-3)" }}>{p === "readonly" ? "只读不写，最安全" : p === "full" ? "全部自动执行" : "写操作需确认"}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+                            {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -223,8 +232,8 @@ export default function Composer() {
                 <ChevronDown size={11} />
               </button>
               {showPermMenu && (
-                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 200, zIndex: 9999 }}>
-                  {(["readonly", "default", "full"] as PermLevel[]).map((p) => (
+                <div style={{ position: "absolute", bottom: "100%", marginBottom: 8, left: 0, background: "var(--bg-dropdown)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: 5, minWidth: 220, zIndex: 9999 }}>
+                  {(["L1", "L2", "L3"] as PermLevel[]).map((p) => (
                     <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
                       style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
@@ -232,7 +241,9 @@ export default function Composer() {
                       <span><PermIcon perm={p} size={15} /></span>
                       <div>
                         <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{p === "readonly" ? "只读不写，最安全" : p === "full" ? "全部自动执行" : "写操作需确认"}</div>
+                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+                          {p === "L1" ? "只读不写，完全防护" : p === "L2" ? "智能放行只读，修改写指令需确认" : "写操作自动放行，高危命令黑名单重度拦截"}
+                        </div>
                       </div>
                     </div>
                   ))}

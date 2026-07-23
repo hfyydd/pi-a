@@ -20,7 +20,7 @@ export type RunMode = "ask" | "plan" | "craft";
  * - default  (L2)：写工具需确认（兼容旧值）
  * - full     (L3)：完全自动，不确认（兼容旧值）
  */
-export type PermLevel = "readonly" | "default" | "full";
+export type PermLevel = "L1" | "L2" | "L3" | "readonly" | "default" | "full";
 
 /** 单次 prompt 的选项（由 UI 传入） */
 export interface PromptOptions {
