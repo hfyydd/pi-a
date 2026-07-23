@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "./store/useStore";
 import { initTheme } from "./store/appStore";
 import Sidebar from "./components/Sidebar";
@@ -11,18 +11,33 @@ import SettingsModal from "./components/SettingsModal";
 
 import AutomationPanel from "./components/AutomationPanel";
 import ExpertPanel from "./components/ExpertPanel";
+import FloatView from "./components/FloatView";
 
 export default function App() {
   const { sidebarCollapsed, activeCategory, loadWorkspaces, loadConversations, loadSettings } = useStore();
+  const [isFloat, setIsFloat] = useState(false);
 
   useEffect(() => {
     const t = initTheme();
     useStore.setState({ theme: t });
+
+    const checkHash = () => {
+      setIsFloat(window.location.hash === "#float" || window.location.search.includes("float=true"));
+    };
+    checkHash();
+    window.addEventListener("hashchange", checkHash);
+
     // 加载全局设置
     loadSettings();
     // 先加载工作空间（确定 currentWorkspaceId），再加载该空间下的对话
     loadWorkspaces().then(() => loadConversations());
+
+    return () => window.removeEventListener("hashchange", checkHash);
   }, []);
+
+  if (isFloat) {
+    return <FloatView />;
+  }
 
   const isMac = navigator.userAgent.includes("Mac");
 

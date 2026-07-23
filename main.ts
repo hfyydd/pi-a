@@ -874,6 +874,39 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         return json({ error: (e as Error).message });
       }
     }
+    // GET /api/system/context — 获取当前前台应用名及选中内容
+    if (path === "/api/system/context" && req.method === "GET") {
+      let app = "";
+      let selection = "";
+      try {
+        const cmd = new Deno.Command("osascript", {
+          args: ["-e", 'tell application "System Events" to name of first process whose frontmost is true']
+        });
+        const r = await cmd.output();
+        app = new TextDecoder().decode(r.stdout).trim();
+      } catch {}
+
+      try {
+        const cmd = new Deno.Command("pbpaste");
+        const r = await cmd.output();
+        selection = new TextDecoder().decode(r.stdout).trim().slice(0, 1000);
+      } catch {}
+
+      return json({ app, selection });
+    }
+
+    // POST /api/float/transfer — 将速唤浮窗记录转存为主会话
+    if (path === "/api/float/transfer" && req.method === "POST") {
+      const b = await req.json();
+      const sessionId = b.sessionId;
+      if (sessionId) {
+        const db = getDb();
+        db.prepare("UPDATE conversations SET category = 'assistant' WHERE id = ?").run(sessionId);
+        return json({ ok: true });
+      }
+      return json({ error: "缺失 sessionId" });
+    }
+
     // GET /api/conv/:id/export?format=md|txt|json — 导出对话
     if (path.includes("/export") && path.startsWith("/api/conv/") && req.method === "GET") {
       const parts = path.split("/");
