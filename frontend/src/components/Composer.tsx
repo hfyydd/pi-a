@@ -1,13 +1,61 @@
 import { useState, useRef, useEffect } from "react";
-import { useStore, type RunMode } from "../store/useStore";
-import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Zap } from "lucide-react";
+import { useStore, type RunMode, type PermLevel } from "../store/useStore";
+import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Zap, Shield, Lock } from "lucide-react";
 
-const MODE_LABELS: Record<RunMode, string> = { ask: "Ask", plan: "Plan", craft: "Craft" };
+interface CombinedOption {
+  key: string;
+  mode: RunMode;
+  permission: PermLevel;
+  title: string;
+  badge?: string;
+  desc: string;
+  icon: any;
+}
 
-function ModeIcon({ mode, size = 13 }: { mode: RunMode; size?: number }) {
-  if (mode === "ask") return <MessageSquare size={size} />;
-  if (mode === "plan") return <ClipboardList size={size} />;
-  return <PenLine size={size} />;
+const COMBINED_OPTIONS: CombinedOption[] = [
+  {
+    key: "ask",
+    mode: "ask",
+    permission: "readonly",
+    title: "Ask 模式",
+    badge: "只读问答",
+    desc: "仅问答沟通，不修改文件或执行指令",
+    icon: MessageSquare,
+  },
+  {
+    key: "plan",
+    mode: "plan",
+    permission: "readonly",
+    title: "Plan 模式",
+    badge: "方案生成",
+    desc: "先规划生成实施方案，经你确认后再执行",
+    icon: ClipboardList,
+  },
+  {
+    key: "craft_default",
+    mode: "craft",
+    permission: "default",
+    title: "Craft (默认权限)",
+    badge: "写需确认",
+    desc: "动手改代码，修改文件与跑命令前需授权确认",
+    icon: Shield,
+  },
+  {
+    key: "craft_full",
+    mode: "craft",
+    permission: "full",
+    title: "Craft (完全访问)",
+    badge: "自动运行",
+    desc: "常用写操作自动执行，高危命令安全拦截",
+    icon: Zap,
+  },
+];
+
+function getActiveOptionKey(mode: RunMode, permission: PermLevel): string {
+  if (mode === "ask") return "ask";
+  if (mode === "plan") return "plan";
+  if (permission === "full" || permission === "L3") return "craft_full";
+  return "craft_default";
 }
 
 export default function Composer() {
@@ -46,6 +94,10 @@ export default function Composer() {
 
   // 是否显示底部空间行（仅无会话时）
   const showBottomBar = currentConvId === null;
+
+  const activeKey = getActiveOptionKey(mode, permission);
+  const activeOpt = COMBINED_OPTIONS.find(o => o.key === activeKey) || COMBINED_OPTIONS[2];
+  const ActiveIcon = activeOpt.icon;
 
   return (
     <div style={{ flexShrink: 0, padding: "8px 28px 16px", background: "linear-gradient(to top, var(--bg) 65%, transparent)" }}>
@@ -95,39 +147,71 @@ export default function Composer() {
               <Plus size={16} />
             </button>
 
-            {/* 模式切换 */}
+            {/* 合并后的单一下拉框（模式与权限一体） */}
             <div style={{ position: "relative" }}>
               <button onClick={() => setShowModeMenu(!showModeMenu)}
                 style={{
-                  display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 8px",
+                  display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 9px",
                   border: "1px solid transparent", borderRadius: 7, background: "transparent",
-                  color: mode === "craft" ? "var(--accent)" : "var(--text-2)", fontSize: 12, fontWeight: 500,
+                  color: mode === "craft" ? (permission === "full" || permission === "L3" ? "var(--accent)" : "var(--text)") : "var(--text-2)", fontSize: 12, fontWeight: 500,
                 }}>
-                <ModeIcon mode={mode} /> {MODE_LABELS[mode]}
+                <ActiveIcon size={14} />
+                <span>{activeOpt.title}</span>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               {showModeMenu && (
-                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 5, minWidth: 220, zIndex: 99999 }}>
-                  {(["ask", "plan", "craft"] as RunMode[]).map((m) => (
-                    <div key={m} onClick={() => {
-                      setMode(m);
-                      if (m === "ask" || m === "plan") {
-                        setPermission("readonly");
-                      } else if (permission === "readonly") {
-                        setPermission("default");
-                      }
-                      setShowModeMenu(false);
-                    }}
-                      style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                      <span><ModeIcon mode={m} size={15} /></span>
-                      <div>
-                        <div style={{ fontSize: "12.5px", fontWeight: 550, color: m === mode ? "var(--accent)" : "var(--text)" }}>{MODE_LABELS[m]} 模式</div>
-                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>{m === "ask" ? "仅问答，自动只读不调工具" : m === "plan" ? "先出方案，确认后再执行" : "动手改代码，边做边测"}</div>
+                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 270, zIndex: 99999 }}>
+                  {COMBINED_OPTIONS.map((opt) => {
+                    const OptIcon = opt.icon;
+                    const isActive = opt.key === activeKey;
+                    return (
+                      <div
+                        key={opt.key}
+                        onClick={() => {
+                          setMode(opt.mode);
+                          setPermission(opt.permission);
+                          setShowModeMenu(false);
+                        }}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "flex-start",
+                          background: isActive ? "var(--bg-hover)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = isActive ? "var(--bg-hover)" : "transparent"}
+                      >
+                        <span style={{ marginTop: 2, color: isActive ? "var(--accent)" : "var(--text-2)" }}>
+                          <OptIcon size={15} />
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: "12.5px", fontWeight: 600, color: isActive ? "var(--accent)" : "var(--text)" }}>
+                              {opt.title}
+                            </span>
+                            {opt.badge && (
+                              <span style={{
+                                fontSize: 10,
+                                padding: "1px 5px",
+                                borderRadius: 4,
+                                background: opt.permission === "full" ? "rgba(239,68,68,0.12)" : opt.permission === "default" ? "var(--accent-soft)" : "var(--bg-sidebar)",
+                                color: opt.permission === "full" ? "#ef4444" : opt.permission === "default" ? "var(--accent)" : "var(--text-3)",
+                                fontWeight: 500
+                              }}>
+                                {opt.badge}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                            {opt.desc}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
