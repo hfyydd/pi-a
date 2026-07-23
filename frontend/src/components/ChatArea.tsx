@@ -3,7 +3,7 @@ import { useStore } from "../store/useStore";
 import "./ChatArea.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getRandomTip } from "../utils/loadingTips";
+import ToolConfirmDialog from "./ToolConfirmDialog";
 import { ChevronDown, Briefcase, Code2, Palette, FileCode, Globe, Bot, MoreHorizontal, FileText, BarChart3, Mail, Layout, Shapes, Image, Check, X, Loader2, Copy, ThumbsUp, ThumbsDown, Volume2, Share2 } from "lucide-react";
 
 
@@ -315,6 +315,9 @@ export default function ChatArea() {
               </div>
             );
           })}
+
+          {/* 内联工具确认卡片 */}
+          <ToolConfirmDialog />
 
           {/* 思考中指示器 */}
           {showThinking && (

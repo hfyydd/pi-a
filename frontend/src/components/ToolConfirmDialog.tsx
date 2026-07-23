@@ -3,14 +3,7 @@ import { ShieldAlert, Play, X } from "lucide-react";
 import "./ToolConfirmDialog.css";
 
 /**
- * 工具确认弹窗（对标 WorkBuddy permissionRequest UI）。
- *
- * WorkBuddy 的权限确认方式：
- *   - 在工具调用块内联显示确认信息
- *   - 提供「运行 / 跳过 / 拒绝」三个选项
- *   - 命令内容直接显示在确认区域
- *
- * 本组件以 overlay 弹窗方式实现，悬浮在聊天区域底部。
+ * 工具确认卡片（对标 WorkBuddy / CodeX：直接内联在 Chat 消息流内部，不使用悬浮弹窗）。
  */
 export default function ToolConfirmDialog() {
   const { pendingConfirm, respondConfirm } = useStore();
@@ -19,7 +12,6 @@ export default function ToolConfirmDialog() {
 
   const { toolName, args } = pendingConfirm;
 
-  // 提取可读描述
   const commandText = toolName === "bash"
     ? (args?.command || "")
     : toolName === "write" || toolName === "edit"
@@ -40,33 +32,67 @@ export default function ToolConfirmDialog() {
   const label = labelMap[toolName] || toolName;
 
   return (
-    <div className="tool-confirm-overlay">
-      <div className="tool-confirm-card">
-        <div className="tool-confirm-header">
-          <ShieldAlert size={16} className="tool-confirm-icon" />
-          <span className="tool-confirm-title">需要确认：{label}</span>
-        </div>
+    <div className="inline-tool-confirm-card" style={{
+      margin: "12px 0",
+      padding: "12px 14px",
+      borderRadius: 12,
+      background: "var(--bg-sidebar)",
+      border: "1px solid var(--accent-border)",
+      boxShadow: "var(--shadow-sm)",
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      maxWidth: 720,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <ShieldAlert size={16} style={{ color: "var(--amber)" }} />
+        <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>
+          申请运行指令：{label}
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "var(--amber-soft)", color: "var(--amber)", fontWeight: 500 }}>
+          需要授权
+        </span>
+      </div>
 
-        <div className="tool-confirm-body">
-          <pre className="tool-confirm-command">{commandText}</pre>
-        </div>
+      <pre style={{
+        fontFamily: "var(--mono)",
+        fontSize: 12,
+        padding: "8px 10px",
+        background: "var(--code-bg)",
+        color: "var(--code-text)",
+        borderRadius: 8,
+        overflowX: "auto",
+        margin: 0,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-all",
+      }}>
+        {commandText}
+      </pre>
 
-        <div className="tool-confirm-actions">
-          <button
-            className="tool-confirm-btn tool-confirm-btn--approve"
-            onClick={() => respondConfirm(true)}
-          >
-            <Play size={13} />
-            运行
-          </button>
-          <button
-            className="tool-confirm-btn tool-confirm-btn--reject"
-            onClick={() => respondConfirm(false)}
-          >
-            <X size={13} />
-            拒绝
-          </button>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", marginTop: 2 }}>
+        <button
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "5px 12px", borderRadius: 6, border: "none",
+            background: "var(--accent)", color: "#fff",
+            fontSize: 12, fontWeight: 500, cursor: "pointer",
+          }}
+          onClick={() => respondConfirm(true)}
+        >
+          <Play size={13} /> 授权运行
+        </button>
+        <button
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "5px 12px", borderRadius: 6,
+            border: "1px solid var(--border-strong)",
+            background: "var(--bg)", color: "var(--text)",
+            fontSize: 12, fontWeight: 500, cursor: "pointer",
+          }}
+          onClick={() => respondConfirm(false)}
+        >
+          <X size={13} /> 拒绝执行
+        </button>
       </div>
     </div>
   );

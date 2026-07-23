@@ -55,7 +55,6 @@ export default function App() {
       </div>
       <WorkspaceModal />
       <SettingsModal />
-      <ToolConfirmDialog />
       <AskUserQuestionDialog />
     </div>
   );
