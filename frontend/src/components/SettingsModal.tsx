@@ -10,6 +10,7 @@ import "./SettingsModal.css";
 type TabId =
   | "account"
   | "system"
+  | "computer_use"
   | "agent"
   | "shortcut"
   | "memory"
@@ -29,6 +30,7 @@ interface TabItem {
 const TABS: TabItem[] = [
   { id: "account", label: "账户管理", icon: User },
   { id: "system", label: "系统设置", icon: Settings },
+  { id: "computer_use", label: "电脑操控 (Computer Use)", icon: Laptop },
   { id: "agent", label: "智能体设置", icon: Cpu },
   { id: "shortcut", label: "快捷键", icon: Keyboard },
   { id: "memory", label: "记忆", icon: Brain },
@@ -106,6 +108,35 @@ export default function SettingsModal() {
     else updateSettings({ securityNetworkRules: str });
   };
 
+  // State for Computer Use system permissions
+  const [systemPerms, setSystemPerms] = useState<any>(null);
+  const [loadingPerms, setLoadingPerms] = useState(false);
+
+  const fetchSystemPerms = async () => {
+    setLoadingPerms(true);
+    try {
+      const res = await fetch("/api/system/permissions");
+      const data = await res.json();
+      setSystemPerms(data);
+    } catch (e) {
+      console.error("[SettingsModal] 获取权限状态失败:", e);
+    } finally {
+      setLoadingPerms(false);
+    }
+  };
+
+  const openSystemSettings = async (target: "accessibility" | "screen") => {
+    try {
+      await fetch("/api/system/permissions/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target }),
+      });
+    } catch (e) {
+      console.error("[SettingsModal] 打开系统偏好设置失败:", e);
+    }
+  };
+
   // Load memories and settings keys on mount
   useEffect(() => {
     if (showSettings) {
@@ -115,6 +146,9 @@ export default function SettingsModal() {
       }
       if (activeTab === "security") {
         loadAuditLogs();
+      }
+      if (activeTab === "computer_use") {
+        fetchSystemPerms();
       }
     }
   }, [showSettings, activeTab]);
@@ -171,6 +205,93 @@ export default function SettingsModal() {
   // Render Right Details Panel according to activeTab
   const renderContent = () => {
     switch (activeTab) {
+      case "computer_use":
+        return (
+          <div className="settings-tab-content">
+            <h2 className="settings-content-title">电脑操控 (Computer Use)</h2>
+            <p className="settings-section-desc" style={{ color: "var(--text-2)", marginBottom: 16, fontSize: 13 }}>
+              基于 CodeX / Anthropic 规范的屏幕识别与鼠标键盘掌控通道。支持 Retina 高分屏坐标自动换算与 AppleScript 降级执行。
+            </p>
+
+            <div className="settings-section">
+              {/* 依赖与权限检测卡片 */}
+              <div className="security-card-box full-width">
+                <div className="security-card-header">
+                  <div className="security-card-title-group">
+                    <Laptop size={18} className="icon-blue" />
+                    <h3 className="security-card-title">系统依赖与权限诊断</h3>
+                  </div>
+                  <button className="settings-btn" onClick={fetchSystemPerms} disabled={loadingPerms}>
+                    {loadingPerms ? "检测中..." : "重新检测"}
+                  </button>
+                </div>
+
+                <div className="perm-diag-list" style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* 屏幕录制 */}
+                  <div className="perm-diag-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-subtle)", borderRadius: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>屏幕录制权限 (Screen Recording)</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>用于截取当前屏幕提供给视觉 LLM 分析</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className={`log-status-badge ${systemPerms?.screenRecordingGranted ? "success" : "error"}`}>
+                        {systemPerms?.screenRecordingGranted ? "已准备就绪" : "待检测 / 未授权"}
+                      </span>
+                      <button className="settings-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => openSystemSettings("screen")}>
+                        打开授权设置
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 辅助功能 */}
+                  <div className="perm-diag-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-subtle)", borderRadius: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>辅助功能权限 (Accessibility)</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>用于模拟点击、键盘输入与滚动控制</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className={`log-status-badge ${systemPerms?.accessibilityGranted ? "success" : "error"}`}>
+                        {systemPerms?.accessibilityGranted ? "已授权" : "未授权 (将拦截点击)"}
+                      </span>
+                      <button className="settings-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => openSystemSettings("accessibility")}>
+                        打开授权设置
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* cliclick 依赖 */}
+                  <div className="perm-diag-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-subtle)", borderRadius: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>cliclick 命令行工具 (快捷操作增强)</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>未安装时系统将自动降级使用 macOS 原生 AppleScript</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className={`log-status-badge ${systemPerms?.cliclickInstalled ? "success" : "warning"}`} style={!systemPerms?.cliclickInstalled ? { background: "var(--amber-soft)", color: "var(--amber)" } : {}}>
+                        {systemPerms?.cliclickInstalled ? "已安装" : "未安装 (已降级原生)"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 显示器分辨率与 Retina 信息 */}
+                  {systemPerms?.metrics && (
+                    <div className="perm-diag-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-subtle)", borderRadius: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>显示屏分辨率与缩放比</div>
+                        <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                          逻辑点阵: {systemPerms.metrics.width} x {systemPerms.metrics.height} | 缩放比: {systemPerms.metrics.scaleFactor}x
+                        </div>
+                      </div>
+                      <div style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--text-2)", fontWeight: 500 }}>
+                        Retina 坐标自动换算就绪
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case "system":
         return (
           <div className="settings-tab-content">

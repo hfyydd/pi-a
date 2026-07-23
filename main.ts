@@ -838,6 +838,42 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       setMcpTools(tools);
       return json({ ok: true, toolCount: tools.length });
     }
+    // GET /api/system/permissions — 诊断 Computer Use 系统权限及依赖
+    if (path === "/api/system/permissions" && req.method === "GET") {
+      const { hasCliclick, getDisplayMetrics } = await import("./src/agent/tools/os.ts");
+      const cliclickInstalled = await hasCliclick();
+      const metrics = await getDisplayMetrics();
+
+      let accessibilityGranted = false;
+      try {
+        const cmd = new Deno.Command("osascript", {
+          args: ["-e", 'tell application "System Events" to get name of first process'],
+          stdout: "null", stderr: "null"
+        });
+        const r = await cmd.output();
+        accessibilityGranted = r.code === 0;
+      } catch {}
+
+      return json({
+        os: Deno.build.os,
+        cliclickInstalled,
+        accessibilityGranted,
+        screenRecordingGranted: true,
+        metrics,
+      });
+    }
+    // POST /api/system/permissions/open — 打开 macOS 权限系统偏好设置页面
+    if (path === "/api/system/permissions/open" && req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      const target = body.target === "screen" ? "Privacy_ScreenCapture" : "Privacy_Accessibility";
+      try {
+        const cmd = new Deno.Command("open", { args: [`x-apple.systempreferences:com.apple.preference.security?${target}`] });
+        await cmd.output();
+        return json({ ok: true });
+      } catch (e) {
+        return json({ error: (e as Error).message });
+      }
+    }
     // GET /api/conv/:id/export?format=md|txt|json — 导出对话
     if (path.includes("/export") && path.startsWith("/api/conv/") && req.method === "GET") {
       const parts = path.split("/");

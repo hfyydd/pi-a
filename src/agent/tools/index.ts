@@ -7,7 +7,7 @@ import { createCodingTools, createReadOnlyTools } from "@earendil-works/pi-codin
 import { memoryRecallTool, memoryWriteTool } from "./memory.ts";
 import { readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool } from "./doc.ts";
 import { webFetchTool, webSearchTool } from "./web.ts";
-import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool } from "./os.ts";
+import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, computerTool } from "./os.ts";
 import { indexDocTool, searchDocsTool } from "./rag.ts";
 import { taskTool } from "./task.ts";
 import { sandboxedBashTool } from "./sandbox.ts";
@@ -47,14 +47,15 @@ export function getFullTools(): AgentTool<any>[] {
     editPptxTool,
     webFetchTool,
     webSearchTool,
-    // Computer Use 工具（功能13）
+    // Computer Use 工具（对标 CodeX / Anthropic 规范）
+    computerTool,
     screenshotTool,
     mouseClickTool,
     mouseMoveTool,
     keyTypeTool,
     appFocusTool,
     cursorPosTool,
-    // RAG 工具（功能18）
+    // RAG 工具
     indexDocTool,
     searchDocsTool,
     taskTool,
@@ -76,4 +77,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, sandboxedBashTool, callSubagentTool, askUserQuestionTool, connectCloudServiceTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, computerTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, sandboxedBashTool, callSubagentTool, askUserQuestionTool, connectCloudServiceTool };

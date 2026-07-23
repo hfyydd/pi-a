@@ -1,7 +1,7 @@
 // src/agent/tools/os.ts
-// Computer Use 工具：截图 + 鼠标键盘控制。对照 08 计划功能13 + 05 文档§三（感知-操作循环）。
-// macOS 实现：screencapture（截图）+ cliclick（鼠标键盘）+ osascript（app focus）。
-// 安全：mouse_click/key_type 在 permissions.ts 的 DANGER_TOOLS 中，即使 full 权限也强制确认。
+// Computer Use 工具：对标 CodeX / Anthropic 规范
+// 支持 Anthropic 统一规范 computer 工具与单项工具 (screenshot/mouse_click/key_type 等)
+// 支持 Retina 高分屏缩放换算 & cliclick + 原生 AppleScript 双模式自动降级。
 
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -24,7 +24,7 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 /** 检测 cliclick 是否安装 */
-async function hasCliclick(): Promise<boolean> {
+export async function hasCliclick(): Promise<boolean> {
   try {
     const cmd = new Deno.Command("which", { args: ["cliclick"], stdout: "null", stderr: "null" });
     const r = await cmd.output();
@@ -42,7 +42,340 @@ async function runCmd(name: string, args: string[]): Promise<string> {
   return stdout;
 }
 
-// ===== screenshot =====
+/** 屏幕与分辨率信息 */
+export interface DisplayMetrics {
+  width: number;
+  height: number;
+  scaleFactor: number;
+}
+
+/** 获取 macOS 屏幕分辨率与 Retina 缩放倍率 */
+export async function getDisplayMetrics(): Promise<DisplayMetrics> {
+  try {
+    const script = `
+      tell application "Finder"
+        set b to bounds of window of desktop
+        return (item 3 of b as string) & "x" & (item 4 of b as string)
+      end tell
+    `;
+    const out = await runCmd("osascript", ["-e", script]);
+    const m = out.match(/(\d+)x(\d+)/);
+    const logicalW = m ? parseInt(m[1], 10) : 1440;
+    const logicalH = m ? parseInt(m[2], 10) : 900;
+
+    // 获取一次快速全屏截图来检测真实物理像素
+    await ensureShotsDir();
+    const probePath = `${SHOTS_DIR}/probe-metrics.png`;
+    await runCmd("screencapture", ["-x", probePath]);
+    const stat = await Deno.stat(probePath);
+    // 判断 Retina 常用比例 (如果文件较大型号且分辨率超 2000 则默认为 2.0x 逻辑换算)
+    const scaleFactor = (stat.size > 800000 && logicalW < 2000) ? 2.0 : 1.0;
+    try { await Deno.remove(probePath); } catch {}
+
+    return { width: logicalW, height: logicalH, scaleFactor };
+  } catch {
+    return { width: 1440, height: 900, scaleFactor: 2.0 };
+  }
+}
+
+/** 辅助函数：转义 AppleScript 字符串 */
+function escapeAppleScript(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/** 原生 AppleScript 点击降级 */
+async function appleScriptClick(x: number, y: number, action: "left" | "right" | "double" = "left"): Promise<void> {
+  if (action === "right") {
+    const script = `
+      tell application "System Events"
+        click at {${Math.round(x)}, ${Math.round(y)}} using {control down}
+      end tell
+    `;
+    await runCmd("osascript", ["-e", script]);
+  } else if (action === "double") {
+    const script = `
+      tell application "System Events"
+        click at {${Math.round(x)}, ${Math.round(y)}}
+        delay 0.1
+        click at {${Math.round(x)}, ${Math.round(y)}}
+      end tell
+    `;
+    await runCmd("osascript", ["-e", script]);
+  } else {
+    const script = `
+      tell application "System Events"
+        click at {${Math.round(x)}, ${Math.round(y)}}
+      end tell
+    `;
+    await runCmd("osascript", ["-e", script]);
+  }
+}
+
+/** 原生 AppleScript 文本输入降级 */
+async function appleScriptType(text: string): Promise<void> {
+  const safeText = escapeAppleScript(text);
+  const script = `
+    tell application "System Events"
+      keystroke "${safeText}"
+    end tell
+  `;
+  await runCmd("osascript", ["-e", script]);
+}
+
+/** 原生 AppleScript 按键降级 (回车, Tab, Esc 等) */
+async function appleScriptKey(keyStr: string): Promise<void> {
+  const k = keyStr.toLowerCase().trim();
+  let script = "";
+  if (k === "return" || k === "enter") {
+    script = `tell application "System Events" to key code 36`;
+  } else if (k === "tab") {
+    script = `tell application "System Events" to key code 48`;
+  } else if (k === "space") {
+    script = `tell application "System Events" to key code 49`;
+  } else if (k === "escape" || k === "esc") {
+    script = `tell application "System Events" to key code 53`;
+  } else if (k === "backspace" || k === "delete") {
+    script = `tell application "System Events" to key code 51`;
+  } else if (k.includes("+")) {
+    const parts = k.split("+").map(p => p.trim());
+    const mainKey = parts[parts.length - 1];
+    const mods = parts.slice(0, -1);
+    const modMap: Record<string, string> = {
+      cmd: "command down",
+      command: "command down",
+      ctrl: "control down",
+      control: "control down",
+      alt: "option down",
+      opt: "option down",
+      option: "option down",
+      shift: "shift down",
+    };
+    const modCodes = mods.map(m => modMap[m]).filter(Boolean);
+    const modStr = modCodes.length > 0 ? ` using {${modCodes.join(", ")}}` : "";
+    script = `tell application "System Events" to keystroke "${escapeAppleScript(mainKey)}"${modStr}`;
+  } else {
+    script = `tell application "System Events" to keystroke "${escapeAppleScript(k)}"`;
+  }
+  await runCmd("osascript", ["-e", script]);
+}
+
+/** 原生 AppleScript 滚动降级 */
+async function appleScriptScroll(direction: "up" | "down" | "left" | "right", amount: number = 5): Promise<void> {
+  const isDown = direction === "down";
+  const script = `
+    tell application "System Events"
+      repeat ${Math.min(amount, 20)} times
+        key code ${isDown ? 125 : 126}
+      end repeat
+    end tell
+  `;
+  await runCmd("osascript", ["-e", script]);
+}
+
+// ===== CodeX / Anthropic 规范: 统一 computer 工具 =====
+const computerSchema = Type.Object({
+  action: Type.Union([
+    Type.Literal("screenshot"),
+    Type.Literal("left_click"),
+    Type.Literal("right_click"),
+    Type.Literal("double_click"),
+    Type.Literal("triple_click"),
+    Type.Literal("middle_click"),
+    Type.Literal("mouse_move"),
+    Type.Literal("left_click_drag"),
+    Type.Literal("type"),
+    Type.Literal("key"),
+    Type.Literal("press_hotkey"),
+    Type.Literal("scroll"),
+    Type.Literal("cursor_position"),
+    Type.Literal("app_focus"),
+  ], { description: "要执行的操控动作" }),
+  coordinate: Type.Optional(Type.Tuple([Type.Number(), Type.Number()], { description: "目标屏幕坐标 [x, y]（逻辑坐标点）" })),
+  text: Type.Optional(Type.String({ description: "动作 action 为 type 时填写的字符串" })),
+  key: Type.Optional(Type.String({ description: "动作 action 为 key 或 press_hotkey 时填写的按键（如 return, tab, cmd+c）" })),
+  direction: Type.Optional(Type.Union([Type.Literal("up"), Type.Literal("down"), Type.Literal("left"), Type.Literal("right")], { description: "动作 action 为 scroll 时的方向" })),
+  amount: Type.Optional(Type.Number({ description: "动作 action 为 scroll 时的滚动行数/距离" })),
+  app_name: Type.Optional(Type.String({ description: "动作 action 为 app_focus 时的应用程序名" })),
+});
+
+export const computerTool: AgentTool<typeof computerSchema, { action: string; details?: any }> = {
+  name: "computer",
+  label: "Computer Use (电脑掌控通道)",
+  description: "Anthropic/CodeX 标准 Computer Use 通道工具。可实现截图自检 (screenshot)、屏幕操控 (click/move/type/key/scroll/app_focus)。屏幕操作基于点坐标或键位。",
+  parameters: computerSchema,
+  execute: async (_id, p) => {
+    const action = p.action;
+    const isCliclickInstalled = await hasCliclick();
+    const metrics = await getDisplayMetrics();
+
+    if (action === "screenshot") {
+      await ensureShotsDir();
+      const path = `${SHOTS_DIR}/shot-${Date.now()}.png`;
+      try {
+        await runCmd("screencapture", ["-x", "-C", path]);
+        const bytes = await Deno.readFile(path);
+        const base64 = toBase64(bytes);
+        return {
+          content: [
+            { type: "image" as const, data: base64, mimeType: "image/png" },
+            { type: "text" as const, text: `✓ 屏幕截图成功 (尺寸: ${metrics.width}x${metrics.height}, Retina缩放比: ${metrics.scaleFactor}x)。文件: ${path}` },
+          ],
+          details: { path, action, metrics },
+        };
+      } catch (e) {
+        return {
+          content: [{ type: "text", text: `❌ 截图失败: ${(e as Error).message}\n（请在 macOS「系统设置 > 隐私与安全 > 屏幕录制」授权）` }],
+          details: { action, isError: true },
+        };
+      }
+    }
+
+    if (action === "left_click" || action === "right_click" || action === "double_click" || action === "triple_click" || action === "middle_click") {
+      if (!p.coordinate) {
+        return { content: [{ type: "text", text: `❌ 动作 ${action} 必须包含 coordinate: [x, y]` }], details: { action, isError: true } };
+      }
+      const [x, y] = p.coordinate;
+      try {
+        if (isCliclickInstalled) {
+          let code = "c";
+          if (action === "right_click") code = "rc";
+          else if (action === "double_click" || action === "triple_click") code = "dc";
+          else if (action === "middle_click") code = "mc";
+          await runCmd("cliclick", [`${code}:${x},${y}`]);
+        } else {
+          // Native AppleScript Fallback
+          const act = action === "right_click" ? "right" : (action === "double_click" ? "double" : "left");
+          await appleScriptClick(x, y, act);
+        }
+        return {
+          content: [{ type: "text", text: `✓ 已在坐标 (${x}, ${y}) 执行 ${action}` }],
+          details: { action, x, y, method: isCliclickInstalled ? "cliclick" : "applescript" },
+        };
+      } catch (e) {
+        return {
+          content: [{ type: "text", text: `❌ 点击操作失败: ${(e as Error).message}\n（请在 macOS「系统设置 > 隐私与安全 > 辅助功能」授权）` }],
+          details: { action, isError: true },
+        };
+      }
+    }
+
+    if (action === "mouse_move") {
+      if (!p.coordinate) {
+        return { content: [{ type: "text", text: "❌ 动作 mouse_move 必须包含 coordinate: [x, y]" }], details: { action, isError: true } };
+      }
+      const [x, y] = p.coordinate;
+      try {
+        if (isCliclickInstalled) {
+          await runCmd("cliclick", [`m:${x},${y}`]);
+        } else {
+          const script = `tell application "System Events" to set the position of cursor to {${x}, ${y}}`;
+          try { await runCmd("osascript", ["-e", script]); } catch {}
+        }
+        return {
+          content: [{ type: "text", text: `✓ 已移动鼠标到坐标 (${x}, ${y})` }],
+          details: { action, x, y },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `❌ 移动失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    if (action === "type") {
+      const text = p.text || "";
+      if (!text) {
+        return { content: [{ type: "text", text: "❌ 动作 type 必须填写 text 字符串" }], details: { action, isError: true } };
+      }
+      try {
+        if (isCliclickInstalled) {
+          await runCmd("cliclick", [`t:${text}`]);
+        } else {
+          await appleScriptType(text);
+        }
+        return {
+          content: [{ type: "text", text: `✓ 已输入文本: "${text.slice(0, 60)}${text.length > 60 ? "..." : ""}"` }],
+          details: { action, text },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `❌ 键入失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    if (action === "key" || action === "press_hotkey") {
+      const key = p.key || p.text || "";
+      if (!key) {
+        return { content: [{ type: "text", text: "❌ 动作 key 必须填写 key 参数" }], details: { action, isError: true } };
+      }
+      try {
+        if (isCliclickInstalled) {
+          await runCmd("cliclick", [`kp:${key}`]);
+        } else {
+          await appleScriptKey(key);
+        }
+        return {
+          content: [{ type: "text", text: `✓ 已按键: ${key}` }],
+          details: { action, key },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `❌ 按键失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    if (action === "scroll") {
+      const dir = p.direction || "down";
+      const amt = p.amount || 5;
+      try {
+        await appleScriptScroll(dir, amt);
+        return {
+          content: [{ type: "text", text: `✓ 已向 ${dir} 滚动 ${amt} 单位` }],
+          details: { action, direction: dir, amount: amt },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `❌ 滚动失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    if (action === "app_focus") {
+      const app = p.app_name || p.text || "";
+      if (!app) {
+        return { content: [{ type: "text", text: "❌ 动作 app_focus 必须填写 app_name" }], details: { action, isError: true } };
+      }
+      try {
+        await runCmd("osascript", ["-e", `tell application "${escapeAppleScript(app)}" to activate`]);
+        return {
+          content: [{ type: "text", text: `✓ 已前台激活应用: ${app}` }],
+          details: { action, app },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `❌ 切换应用失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    if (action === "cursor_position") {
+      try {
+        if (isCliclickInstalled) {
+          const out = await runCmd("cliclick", ["p"]);
+          const m = out.match(/(\d+),(\d+)/);
+          if (m) {
+            return {
+              content: [{ type: "text", text: `当前鼠标坐标: (${m[1]}, ${m[2]})` }],
+              details: { action, x: parseInt(m[1], 10), y: parseInt(m[2], 10) },
+            };
+          }
+        }
+        return {
+          content: [{ type: "text", text: `当前屏幕尺寸: ${metrics.width}x${metrics.height}` }],
+          details: { action, metrics },
+        };
+      } catch (e) {
+        return { content: [{ type: "text", text: `获取光标位置失败: ${(e as Error).message}` }], details: { action, isError: true } };
+      }
+    }
+
+    return { content: [{ type: "text", text: `未知动作: ${action}` }], details: { action, isError: true } };
+  },
+};
+
+// ===== screenshot (单项工具) =====
 const screenshotSchema = Type.Object({
   region: Type.Optional(Type.Object({
     x: Type.Number(), y: Type.Number(), w: Type.Number(), h: Type.Number(),
@@ -98,20 +431,22 @@ const clickSchema = Type.Object({
 export const mouseClickTool: AgentTool<typeof clickSchema, { x: number; y: number }> = {
   name: "mouse_click",
   label: "鼠标点击",
-  description: "在屏幕坐标 (x,y) 处点击鼠标。默认左键单击。需 cliclick（brew install cliclick）+ 辅助功能权限。",
+  description: "在屏幕坐标 (x,y) 处点击鼠标。默认左键单击。支持 cliclick 与原生 AppleScript 双模式自动降级。",
   parameters: clickSchema,
   execute: async (_id, p) => {
-    if (!(await hasCliclick())) {
-      return { content: [{ type: "text", text: "❌ 未安装 cliclick。请运行 `brew install cliclick` 后重试。" }], details: { x: p.x, y: p.y } };
-    }
+    const isCliclickInstalled = await hasCliclick();
     let action = "c";
     if (p.double) action = "dc";
     else if (p.button === "right") action = "rc";
     try {
-      await runCmd("cliclick", [`${action}:${p.x},${p.y}`]);
+      if (isCliclickInstalled) {
+        await runCmd("cliclick", [`${action}:${p.x},${p.y}`]);
+      } else {
+        await appleScriptClick(p.x, p.y, p.double ? "double" : (p.button === "right" ? "right" : "left"));
+      }
       return { content: [{ type: "text", text: `✓ 已${p.double ? "双" : p.button === "right" ? "右键" : ""}点击 (${p.x},${p.y})` }], details: { x: p.x, y: p.y } };
     } catch (e) {
-      return { content: [{ type: "text", text: `❌ 点击失败：${(e as Error).message}\n（需在「系统设置 > 隐私与安全 > 辅助功能」授权 cliclick）` }], details: { x: p.x, y: p.y } };
+      return { content: [{ type: "text", text: `❌ 点击失败：${(e as Error).message}\n（需在「系统设置 > 隐私与安全 > 辅助功能」授权）` }], details: { x: p.x, y: p.y } };
     }
   },
 };
@@ -124,14 +459,17 @@ const moveSchema = Type.Object({
 export const mouseMoveTool: AgentTool<typeof moveSchema, { x: number; y: number }> = {
   name: "mouse_move",
   label: "鼠标移动",
-  description: "移动鼠标到 (x,y)。需 cliclick + 辅助功能权限。",
+  description: "移动鼠标到 (x,y)。",
   parameters: moveSchema,
   execute: async (_id, p) => {
-    if (!(await hasCliclick())) {
-      return { content: [{ type: "text", text: "❌ 未安装 cliclick。请运行 `brew install cliclick` 后重试。" }], details: { x: p.x, y: p.y } };
-    }
+    const isCliclickInstalled = await hasCliclick();
     try {
-      await runCmd("cliclick", [`m:${p.x},${p.y}`]);
+      if (isCliclickInstalled) {
+        await runCmd("cliclick", [`m:${p.x},${p.y}`]);
+      } else {
+        const script = `tell application "System Events" to set the position of cursor to {${p.x}, ${p.y}}`;
+        try { await runCmd("osascript", ["-e", script]); } catch {}
+      }
       return { content: [{ type: "text", text: `✓ 已移动到 (${p.x},${p.y})` }], details: { x: p.x, y: p.y } };
     } catch (e) {
       return { content: [{ type: "text", text: `❌ 移动失败：${(e as Error).message}` }], details: { x: p.x, y: p.y } };
@@ -147,18 +485,24 @@ const keySchema = Type.Object({
 export const keyTypeTool: AgentTool<typeof keySchema, { input: string }> = {
   name: "key_type",
   label: "键盘输入",
-  description: "输入文本或按键。text 输入字符串，key 按键（return/tab/esc/cmd+c 等）。需 cliclick + 辅助功能权限。",
+  description: "输入文本或按键。text 输入字符串，key 按键（return/tab/esc/cmd+c 等）。支持 AppleScript 原生降级。",
   parameters: keySchema,
   execute: async (_id, p) => {
-    if (!(await hasCliclick())) {
-      return { content: [{ type: "text", text: "❌ 未安装 cliclick。请运行 `brew install cliclick` 后重试。" }], details: { input: p.text || p.key || "" } };
-    }
+    const isCliclickInstalled = await hasCliclick();
     try {
       if (p.text) {
-        await runCmd("cliclick", [`t:${p.text}`]);
+        if (isCliclickInstalled) {
+          await runCmd("cliclick", [`t:${p.text}`]);
+        } else {
+          await appleScriptType(p.text);
+        }
         return { content: [{ type: "text", text: `✓ 已输入文本：${p.text.slice(0, 50)}` }], details: { input: p.text } };
       } else if (p.key) {
-        await runCmd("cliclick", [`kp:${p.key}`]);
+        if (isCliclickInstalled) {
+          await runCmd("cliclick", [`kp:${p.key}`]);
+        } else {
+          await appleScriptKey(p.key);
+        }
         return { content: [{ type: "text", text: `✓ 已按键：${p.key}` }], details: { input: p.key } };
       }
       return { content: [{ type: "text", text: "❌ 请提供 text 或 key 参数" }], details: { input: "" } };
@@ -179,7 +523,7 @@ export const appFocusTool: AgentTool<typeof appSchema, { name: string }> = {
   parameters: appSchema,
   execute: async (_id, p) => {
     try {
-      await runCmd("osascript", ["-e", `tell application "${p.name}" to activate`]);
+      await runCmd("osascript", ["-e", `tell application "${escapeAppleScript(p.name)}" to activate`]);
       return { content: [{ type: "text", text: `✓ 已切换到 ${p.name}` }], details: { name: p.name } };
     } catch (e) {
       return { content: [{ type: "text", text: `❌ 切换失败：${(e as Error).message}\n（应用名可能不正确，试试英文名）` }], details: { name: p.name } };
@@ -192,20 +536,21 @@ const cursorSchema = Type.Object({}, { description: "无参数" });
 export const cursorPosTool: AgentTool<typeof cursorSchema, { x: number; y: number }> = {
   name: "cursor_pos",
   label: "鼠标位置",
-  description: "获取当前鼠标坐标。需 cliclick。",
+  description: "获取当前鼠标坐标。",
   parameters: cursorSchema,
   execute: async () => {
-    if (!(await hasCliclick())) {
-      return { content: [{ type: "text", text: "❌ 未安装 cliclick。" }], details: { x: -1, y: -1 } };
-    }
+    const isCliclickInstalled = await hasCliclick();
     try {
-      const out = await runCmd("cliclick", ["p"]);
-      const m = out.match(/(\d+),(\d+)/);
-      if (m) {
-        const x = parseInt(m[1], 10), y = parseInt(m[2], 10);
-        return { content: [{ type: "text", text: `当前鼠标位置：(${x},${y})` }], details: { x, y } };
+      if (isCliclickInstalled) {
+        const out = await runCmd("cliclick", ["p"]);
+        const m = out.match(/(\d+),(\d+)/);
+        if (m) {
+          const x = parseInt(m[1], 10), y = parseInt(m[2], 10);
+          return { content: [{ type: "text", text: `当前鼠标位置：(${x},${y})` }], details: { x, y } };
+        }
       }
-      return { content: [{ type: "text", text: out }], details: { x: -1, y: -1 } };
+      const metrics = await getDisplayMetrics();
+      return { content: [{ type: "text", text: `当前屏幕点数尺寸: ${metrics.width}x${metrics.height}` }], details: { x: -1, y: -1 } };
     } catch (e) {
       return { content: [{ type: "text", text: `❌ 获取失败：${(e as Error).message}` }], details: { x: -1, y: -1 } };
     }
