@@ -254,32 +254,18 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
 
   const isMac = useMemo(() => navigator.userAgent.includes("Mac"), []);
 
-  // 收起状态：渲染窄 rail（保留交通灯占位 + 常驻展开按钮），不卸载以免丢失展开入口
-  if (collapsed) {
-    return (
-      <aside className="sidebar collapsed">
-        <div className="sidebar-collapsed-rail">
-          {isMac && <div className="sidebar-traffic-lights-spacer-v" />}
-          <button className="sidebar-icon-btn" onClick={toggleSidebar} title="展开侧边栏">
-            <PanelLeft size={17} />
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* ── 标题栏 (无标题栏/透明标题栏适配) ── */}
       <div className="sidebar-header-container">
         <div className="sidebar-top-row">
           {isMac && <div className="sidebar-traffic-lights-spacer" />}
           <div className="sidebar-brand-row">
             <span className="sidebar-brand-name">Pi-a</span>
-            <span className="sidebar-brand-version">v0.0.1</span>
+            <span className="sidebar-brand-version">v2.0</span>
           </div>
           <div className="sidebar-top-actions">
-            <button className="sidebar-icon-btn" onClick={toggleSidebar} title="收起侧边栏">
+            <button className="sidebar-icon-btn sidebar-toggle-btn" onClick={toggleSidebar} title={collapsed ? "展开侧边栏" : "收起侧边栏"}>
               <PanelLeft size={17} />
             </button>
             <button
