@@ -14,48 +14,28 @@ interface CombinedOption {
 
 const COMBINED_OPTIONS: CombinedOption[] = [
   {
-    key: "ask",
-    mode: "ask",
-    permission: "readonly",
-    title: "Ask 模式",
-    badge: "只读问答",
-    desc: "仅问答沟通，不修改文件或执行指令",
-    icon: MessageSquare,
-  },
-  {
-    key: "plan",
-    mode: "plan",
-    permission: "readonly",
-    title: "Plan 模式",
-    badge: "方案生成",
-    desc: "先规划生成实施方案，经你确认后再执行",
-    icon: ClipboardList,
-  },
-  {
-    key: "craft_default",
+    key: "default",
     mode: "craft",
     permission: "default",
-    title: "Craft (默认权限)",
+    title: "默认权限",
     badge: "写需确认",
-    desc: "动手改代码，修改文件与跑命令前需授权确认",
+    desc: "智能放行只读操作，修改文件与终端指令需弹窗授权",
     icon: Shield,
   },
   {
-    key: "craft_full",
+    key: "full",
     mode: "craft",
     permission: "full",
-    title: "Craft (完全访问)",
+    title: "完全访问",
     badge: "自动运行",
-    desc: "常用写操作自动执行，高危命令安全拦截",
+    desc: "常用写操作与指令自动执行，高危系统命令安全拦截",
     icon: Zap,
   },
 ];
 
-function getActiveOptionKey(mode: RunMode, permission: PermLevel): string {
-  if (mode === "ask") return "ask";
-  if (mode === "plan") return "plan";
-  if (permission === "full" || permission === "L3") return "craft_full";
-  return "craft_default";
+function getActiveOptionKey(permission: PermLevel): string {
+  if (permission === "full" || permission === "L3") return "full";
+  return "default";
 }
 
 export default function Composer() {
@@ -95,8 +75,8 @@ export default function Composer() {
   // 是否显示底部空间行（仅无会话时）
   const showBottomBar = currentConvId === null;
 
-  const activeKey = getActiveOptionKey(mode, permission);
-  const activeOpt = COMBINED_OPTIONS.find(o => o.key === activeKey) || COMBINED_OPTIONS[2];
+  const activeKey = getActiveOptionKey(permission);
+  const activeOpt = COMBINED_OPTIONS.find(o => o.key === activeKey) || COMBINED_OPTIONS[0];
   const ActiveIcon = activeOpt.icon;
 
   return (
