@@ -1,27 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { useStore, type RunMode, type PermLevel } from "../store/useStore";
-import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Lock, Shield, Zap } from "lucide-react";
+import { useStore, type RunMode } from "../store/useStore";
+import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList } from "lucide-react";
 
 const MODE_LABELS: Record<RunMode, string> = { ask: "Ask", plan: "Plan", craft: "Craft" };
-const PERM_LABELS: Record<string, string> = {
-  readonly: "只读模式",
-  default: "写需确认",
-  full: "自动运行",
-  L1: "只读模式",
-  L2: "写需确认",
-  L3: "自动运行",
-};
 
 function ModeIcon({ mode, size = 13 }: { mode: RunMode; size?: number }) {
   if (mode === "ask") return <MessageSquare size={size} />;
   if (mode === "plan") return <ClipboardList size={size} />;
   return <PenLine size={size} />;
-}
-
-function PermIcon({ perm, size = 13 }: { perm: PermLevel; size?: number }) {
-  if (perm === "readonly" || perm === "L1") return <Lock size={size} />;
-  if (perm === "full" || perm === "L3") return <Zap size={size} />;
-  return <Shield size={size} />;
 }
 
 export default function Composer() {
@@ -34,7 +20,6 @@ export default function Composer() {
     c => c.parentId === currentConvId && c.status === "running"
   );
   const [showModeMenu, setShowModeMenu] = useState(false);
-  const [showPermMenu, setShowPermMenu] = useState(false);
   const [showWsPicker, setShowWsPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -147,39 +132,6 @@ export default function Composer() {
               )}
             </div>
 
-            {/* 权限切换（仅 Craft 动手模式下才需弹窗选择：写需确认 vs 自动运行） */}
-            {mode === "craft" && (
-              <div style={{ position: "relative" }}>
-                <button onClick={() => { setShowPermMenu(!showPermMenu); setShowModeMenu(false); }}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 8px",
-                    border: "1px solid transparent", borderRadius: 7, background: "transparent",
-                    color: permission === "full" ? "var(--accent)" : "var(--text-2)", fontSize: 12, fontWeight: 500,
-                  }}>
-                  <PermIcon perm={permission} /> {PERM_LABELS[permission]}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
-                </button>
-              {showPermMenu && (
-                <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: 0, background: "var(--bg)", backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "0 12px 36px rgba(0,0,0,0.45)", padding: 6, minWidth: 260, zIndex: 99999 }}>
-                  {(["default", "full"] as PermLevel[]).map((p) => (
-                    <div key={p} onClick={() => { setPermission(p); setShowPermMenu(false); }}
-                      style={{ padding: "8px 10px", borderRadius: 7, cursor: "pointer", display: "flex", gap: 9, alignItems: "flex-start" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                      <span><PermIcon perm={p} size={15} /></span>
-                      <div>
-                        <div style={{ fontSize: "12.5px", fontWeight: 550, color: p === permission ? "var(--accent)" : "var(--text)" }}>{PERM_LABELS[p]}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-3)" }}>
-                          {p === "default" ? "智能放行只读，写指令弹窗授权" : "常用写操作自动执行，高危命令安全拦截"}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              </div>
-            )}
-
             <div style={{ flex: 1 }} />
 
             {/* 模型选择（对齐 WorkBuddy 截图2） */}
@@ -217,8 +169,7 @@ export default function Composer() {
             <WsPickerDropdown
               label={wsLabel}
               hasSelection={!!composerWorkspaceId}
-              open={showWsPicker}
-              onToggle={() => { setShowWsPicker(!showWsPicker); setShowPermMenu(false); }}
+              onToggle={() => setShowWsPicker(!showWsPicker)}
               onClose={() => setShowWsPicker(false)}
               workspaces={workspaces}
               currentId={composerWorkspaceId}
