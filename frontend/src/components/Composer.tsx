@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useStore, type RunMode } from "../store/useStore";
-import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList } from "lucide-react";
+import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, MessageSquare, PenLine, ClipboardList, Zap } from "lucide-react";
 
 const MODE_LABELS: Record<RunMode, string> = { ask: "Ask", plan: "Plan", craft: "Craft" };
 
@@ -44,7 +44,7 @@ export default function Composer() {
     : null;
   const wsLabel = activeWs?.name || "选择工作空间";
 
-  // 是否显示底部空间/权限行（仅无会话时）
+  // 是否显示底部空间行（仅无会话时）
   const showBottomBar = currentConvId === null;
 
   return (
@@ -97,7 +97,7 @@ export default function Composer() {
 
             {/* 模式切换 */}
             <div style={{ position: "relative" }}>
-              <button onClick={() => { setShowModeMenu(!showModeMenu); setShowPermMenu(false); }}
+              <button onClick={() => setShowModeMenu(!showModeMenu)}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 8px",
                   border: "1px solid transparent", borderRadius: 7, background: "transparent",
@@ -169,6 +169,7 @@ export default function Composer() {
             <WsPickerDropdown
               label={wsLabel}
               hasSelection={!!composerWorkspaceId}
+              open={showWsPicker}
               onToggle={() => setShowWsPicker(!showWsPicker)}
               onClose={() => setShowWsPicker(false)}
               workspaces={workspaces}
