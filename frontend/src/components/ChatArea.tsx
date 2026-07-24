@@ -342,9 +342,141 @@ export default function ChatArea() {
   );
 }
 
-/** 欢迎页（对齐 WorkBuddy 初始界面，使用 lucide 图标） */
+interface PromptScenario {
+  id: string;
+  title: string;
+  desc: string;
+  prompt: string;
+  skillCmd?: string;
+  icon: string;
+}
+
+const SCENARIOS: Record<string, PromptScenario[]> = {
+  "日常办公-文档处理": [
+    {
+      id: "doc-weekly",
+      title: "自动生成工作周报",
+      desc: "整理近期提交记录与项目进展，一键输出结构化 Word 周报",
+      prompt: "请帮我整理并生成一份本周工作周报 Word 文档",
+      skillCmd: "/weekly-report",
+      icon: "📝",
+    },
+    {
+      id: "doc-polish",
+      title: "文档润色与优化",
+      desc: "对文字段落、排版和语言逻辑进行专业升华与结构改进",
+      prompt: "请帮我润色和优化以下文档内容：",
+      skillCmd: "/polish-writing",
+      icon: "✍️",
+    },
+  ],
+  "日常办公-数据分析": [
+    {
+      id: "data-excel",
+      title: "Excel / CSV 数据表格分析",
+      desc: "读取本地表格数据，自动计算关键指标并生成分析结论",
+      prompt: "请帮我读取并分析桌面上的数据表格文件，汇总核心指标与趋势",
+      skillCmd: "/data-analysis",
+      icon: "📊",
+    },
+    {
+      id: "data-ppt",
+      title: "AI 自动生成 PPT 演示",
+      desc: "基于数据分析或汇报大纲，一键生成高保真 PPT 图片与动态演示",
+      prompt: "请使用 ppt-generator-pro 帮我生成一套高保真演示幻灯片",
+      skillCmd: "/ppt-generator-pro",
+      icon: "🎞️",
+    },
+  ],
+  "日常办公-邮件管理": [
+    {
+      id: "mail-draft",
+      title: "商务邮件撰写与回复",
+      desc: "针对业务沟通、汇报对接，一键输出得体专业的商务邮件",
+      prompt: "请帮我撰写一封关于项目合作确认的专业商务邮件",
+      icon: "✉️",
+    },
+  ],
+  "代码开发-日常开发": [
+    {
+      id: "dev-fix",
+      title: "代码检查与 Bug 修复",
+      desc: "分析工作区代码中的类型错误与规范问题并自动修补",
+      prompt: "请扫描当前工作区，帮我分析代码中的潜在错误或规范问题并修补",
+      skillCmd: "/implement",
+      icon: "⚡",
+    },
+    {
+      id: "dev-web",
+      title: "现代 Web 组件构建",
+      desc: "基于 React / CSS 最佳实践构建现代 UI 组件与响应式界面",
+      prompt: "请按照现代 Web 最佳实践为我设计前端界面与组件",
+      skillCmd: "/modern-web-guidance",
+      icon: "🚀",
+    },
+  ],
+  "代码开发-网站开发": [
+    {
+      id: "web-app",
+      title: "全栈 Web App 快速原型",
+      desc: "从零搭建具备现代化 UI 与丰富交互的前端应用原型",
+      prompt: "请帮我从零设计并制作一个现代化 Web 应用原型",
+      skillCmd: "/modern-web-guidance",
+      icon: "🌐",
+    },
+    {
+      id: "chrome-ext",
+      title: "Chrome 扩展开发",
+      desc: "构建与发布 Manifest V3 标准的 Chrome 浏览器插件",
+      prompt: "请帮我设计一个 Manifest V3 的 Chrome 浏览器扩展",
+      skillCmd: "/chrome-extensions",
+      icon: "🧩",
+    },
+  ],
+  "代码开发-Agent 应用": [
+    {
+      id: "agent-browser",
+      title: "ego-browser 浏览器自动化",
+      desc: "使用 Chromium 环境进行网页自动化、截图、表单与数据抓取",
+      prompt: "请使用 ego-browser 帮我打开网站并进行自动化操作",
+      skillCmd: "/ego-browser",
+      icon: "🤖",
+    },
+    {
+      id: "agent-subagent",
+      title: "派发后台子智能体",
+      desc: "在后台独立上下文派发子任务，不占用当前主窗口",
+      prompt: "请在后台帮我执行以下独立任务：",
+      skillCmd: "/subagent",
+      icon: "⚙️",
+    },
+  ],
+  "设计创意-UI 设计": [
+    {
+      id: "design-ui",
+      title: "现代 UI / UX 界面设计",
+      desc: "设计炫酷暗色模式、玻璃拟物与动态微交互 UI 界面",
+      prompt: "请按照现代 Web 最佳实践为我设计一个高颜值的 UI 界面",
+      skillCmd: "/modern-web-guidance",
+      icon: "🎨",
+    },
+  ],
+  "设计创意-图标生成": [
+    {
+      id: "design-icon",
+      title: "矢量 SVG 图标与 Logo",
+      desc: "生成高品质、响应式的应用图标与品牌 SVG 矢量标识",
+      prompt: "请帮我设计一个精致且具备现代辨识度的 SVG 应用 Logo 图标",
+      icon: "💎",
+    },
+  ],
+};
+
+/** 欢迎页（包含主分类、子分类与交互式场景 Prompt 卡片网格） */
 function WelcomeScreen() {
-  const [activeTab, setActiveTab] = useState("代码开发");
+  const { sendMessage } = useStore();
+  const [activeTab, setActiveTab] = useState("日常办公");
+  const [activeSubTab, setActiveSubTab] = useState("文档处理");
 
   const mainTabs = [
     { key: "日常办公", icon: Briefcase },
@@ -352,17 +484,17 @@ function WelcomeScreen() {
     { key: "设计创意", icon: Palette },
   ];
 
-  const subTabs: Record<string, Array<{ key: string; icon: any }>> = {
-    "代码开发": [
-      { key: "日常开发", icon: FileCode },
-      { key: "网站开发", icon: Globe },
-      { key: "Agent 应用", icon: Bot },
-      { key: "更多", icon: MoreHorizontal },
-    ],
+  const subTabsMap: Record<string, Array<{ key: string; icon: any }>> = {
     "日常办公": [
       { key: "文档处理", icon: FileText },
       { key: "数据分析", icon: BarChart3 },
       { key: "邮件管理", icon: Mail },
+      { key: "更多", icon: MoreHorizontal },
+    ],
+    "代码开发": [
+      { key: "日常开发", icon: FileCode },
+      { key: "网站开发", icon: Globe },
+      { key: "Agent 应用", icon: Bot },
       { key: "更多", icon: MoreHorizontal },
     ],
     "设计创意": [
@@ -371,6 +503,14 @@ function WelcomeScreen() {
       { key: "图片编辑", icon: Image },
       { key: "更多", icon: MoreHorizontal },
     ],
+  };
+
+  const currentSubTabs = subTabsMap[activeTab] || [];
+  const currentScenarios = SCENARIOS[`${activeTab}-${activeSubTab}`] || SCENARIOS["日常办公-文档处理"] || [];
+
+  const handleRunScenario = (sc: PromptScenario) => {
+    const fullText = sc.skillCmd ? `${sc.skillCmd} ${sc.prompt}` : sc.prompt;
+    sendMessage(fullText);
   };
 
   return (
@@ -385,11 +525,16 @@ function WelcomeScreen() {
       <div className="welcome-tabs">
         {mainTabs.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
           return (
             <button
               key={tab.key}
-              className={`welcome-tab ${activeTab === tab.key ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.key)}
+              className={`welcome-tab ${isActive ? "active" : ""}`}
+              onClick={() => {
+                setActiveTab(tab.key);
+                const firstSub = (subTabsMap[tab.key] || [])[0]?.key || "文档处理";
+                setActiveSubTab(firstSub);
+              }}
             >
               <Icon size={15} className="welcome-tab-icon" strokeWidth={2} />
               {tab.key}
@@ -398,17 +543,53 @@ function WelcomeScreen() {
         })}
       </div>
 
-      {/* 子分类（根据主 tab 变化） */}
+      {/* 子分类（根据主 tab 动态切换） */}
       <div className="welcome-subtabs">
-        {(subTabs[activeTab] || []).map((sub) => {
+        {currentSubTabs.map((sub) => {
           const Icon = sub.icon;
+          const isActive = activeSubTab === sub.key;
           return (
-            <button key={sub.key} className="welcome-subtab">
+            <button
+              key={sub.key}
+              className={`welcome-subtab ${isActive ? "active" : ""}`}
+              onClick={() => setActiveSubTab(sub.key)}
+            >
               <Icon size={13} className="welcome-subtab-icon" strokeWidth={2} />
               {sub.key}
             </button>
           );
         })}
+      </div>
+
+      {/* 场景 Prompt 快捷卡片网格 */}
+      <div className="welcome-scenarios-grid">
+        {currentScenarios.map((sc) => (
+          <div
+            key={sc.id}
+            className="welcome-scenario-card"
+            onClick={() => handleRunScenario(sc)}
+          >
+            <div className="scenario-card-header">
+              <span className="scenario-icon">{sc.icon}</span>
+              <span className="scenario-title">{sc.title}</span>
+              {sc.skillCmd && <span className="scenario-skill-tag">{sc.skillCmd}</span>}
+            </div>
+            <p className="scenario-desc">{sc.desc}</p>
+            <div className="scenario-card-footer">
+              <span className="scenario-action-hint">点击立即启动 AI 任务</span>
+              <button
+                className="scenario-run-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRunScenario(sc);
+                }}
+                title="立即运行"
+              >
+                ↵
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

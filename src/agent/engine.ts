@@ -12,6 +12,7 @@ import { getTools } from "./tools/index.ts";
 import { loadSkillsPrompt, ensureSkillsDir } from "./skills.ts";
 import { snapshotFile, detectFileWrites } from "../infra/file_snapshot.ts";
 import { recallMemories, recallWorkingMemory } from "../domains/memory/node/store.ts";
+import { getSetting } from "../domains/settings/node/store.ts";
 
 export const SYSTEM_PROMPT = `你是 Pi-a，一个本地优先的 AI 桌面助手。所有数据和计算都在用户本地完成。
 
@@ -169,7 +170,11 @@ export function createWorkBuddyAgent(
   // 注入记忆（自动召回，不用 agent 主动调 memory_recall）
   const memoryPrompt = loadMemoryPrompt();
 
-  const fullSystemPrompt = (opts?.systemPrompt ?? SYSTEM_PROMPT) + memoryPrompt + skillsPrompt;
+  // 注入用户在设置中自定义的 Agent 系统提示词
+  const customUserPrompt = getSetting("agent_system_prompt", "");
+  const customPromptSection = customUserPrompt ? `\n\n<user_custom_instructions>\n${customUserPrompt}\n</user_custom_instructions>` : "";
+
+  const fullSystemPrompt = (opts?.systemPrompt ?? SYSTEM_PROMPT) + customPromptSection + memoryPrompt + skillsPrompt;
 
   const agent = new Agent({
     initialState: {

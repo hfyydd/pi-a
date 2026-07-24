@@ -4,8 +4,11 @@ import { initTheme } from "./store/appStore";
 import Sidebar from "./components/Sidebar";
 import ChatArea from "./components/ChatArea";
 import Composer from "./components/Composer";
+import ArtifactPanel from "./components/ArtifactPanel";
+import CommandPalette from "./components/CommandPalette";
 import WorkspaceModal from "./components/WorkspaceModal";
 import AskUserQuestionDialog from "./components/AskUserQuestionDialog";
+import ToolConfirmDialog from "./components/ToolConfirmDialog";
 import SettingsModal from "./components/SettingsModal";
 
 import AutomationPanel from "./components/AutomationPanel";
@@ -43,18 +46,27 @@ export default function App() {
   return (
     <div className={isMac ? "mac-window" : ""} style={{ display: "flex", height: "100%", overflow: "hidden" }}>
       <Sidebar collapsed={sidebarCollapsed} />
+      
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-        {activeCategory === "automation" ? <AutomationPanel /> :
-         activeCategory === "expert" ? <ExpertPanel /> : (
+        {activeCategory === "automation" ? (
+          <AutomationPanel />
+        ) : activeCategory === "expert" ? (
+          <ExpertPanel />
+        ) : (
           <>
             <ChatArea />
             <Composer />
           </>
         )}
       </div>
+
+      <ArtifactPanel />
+
+      <CommandPalette />
       <WorkspaceModal />
       <SettingsModal />
       <AskUserQuestionDialog />
+      <ToolConfirmDialog />
     </div>
   );
 }

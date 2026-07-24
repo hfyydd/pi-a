@@ -89,6 +89,7 @@ const READ_ONLY_COMMANDS: RegExp[] = [
   /^\s*dig\b/,
   /^\s*nslookup\b/,
   /^\s*host\b/,
+  /^\s*ego-browser\b/,
   /^\s*ifconfig\b/,
   /^\s*ip\s+(addr|link|route)\b/,
 ];
@@ -207,57 +208,28 @@ export function clearConfirmHandler(sessionId: string): void {
 }
 
 /**
- * 工具执行前权限检查 (三层模型 L1/L2/L3)。
+ * 工具执行前权限检查（对齐 pi agent：开发者优先，非毁灭性命令 100% 自动放行）。
  */
 export async function checkToolPermission(
   sessionId: string,
-  permInput: PermLevel = "L2",
+  permInput: PermLevel = "full",
   toolName: string,
   args: unknown,
 ): Promise<PermissionDecision> {
   const level = normalizePermLevel(permInput);
 
-  // ── bash 命令智能分类 ──
+  // ── bash 极危命令黑名单检测（仅拦截系统级毁灭性命令如 rm -rf /） ──
   if (toolName === "bash") {
     const cmdStr = (args as any)?.command || "";
-    const classification = classifyBashSafety(cmdStr);
-
-    if (classification.level === "block") {
+    if (isDangerousCommand(cmdStr)) {
       console.warn(`[permissions] 拦截到黑名单危险命令: ${cmdStr}`);
-      return { allow: false, block: true, reason: classification.reason };
+      return { allow: false, block: true, reason: "⚠️ 检测到危险系统级命令（如 rm -rf /），已被拦截。" };
     }
-
-    if (classification.level === "auto_approve") {
-      return { allow: true };
-    }
-
-    if (level === "L1") {
-      return { allow: false, block: true, reason: "L1 (只读模式) 下拒绝执行非只读 Bash 命令" };
-    }
-
-    if (level === "L3") {
-      // 在 L3 模式下，非黑名单命令放行
-      return { allow: true };
-    }
-
-    // L2 模式下，写命令弹窗确认
-    return await requestUserConfirmation(sessionId, toolName, args);
+    // 对标 pi agent：常规 Shell 指令与脚本 100% 自动执行
+    return { allow: true };
   }
 
-  // ── Computer Use 步数上限 ──
-  if (COMPUTER_USE_ACTION_TOOLS.has(toolName)) {
-    const count = (computerUseCount.get(sessionId) ?? 0) + 1;
-    computerUseCount.set(sessionId, count);
-    if (count > MAX_COMPUTER_USE_STEPS) {
-      return {
-        allow: false,
-        block: true,
-        reason: `Computer Use 操控步数已达上限 ${MAX_COMPUTER_USE_STEPS} 步，已被系统防失控熔断机制拦截。`,
-      };
-    }
-  }
-
-  // ── L1 模式 (只读) ──
+  // ── L1 显式只读模式 ──
   if (level === "L1") {
     if (!READ_ONLY_TOOLS.has(toolName)) {
       return { allow: false, block: true, reason: `L1 (只读模式) 下工具 ${toolName} 被禁止调用` };
@@ -265,20 +237,7 @@ export async function checkToolPermission(
     return { allow: true };
   }
 
-  // ── L3 模式 (完全控制) ──
-  if (level === "L3") {
-    if (DANGER_TOOLS.has(toolName)) {
-      // 屏幕高危操控即便在 L3 也二次确认
-      return await requestUserConfirmation(sessionId, toolName, args);
-    }
-    return { allow: true };
-  }
-
-  // ── L2 模式 (标准) ──
-  if (WRITE_TOOLS.has(toolName)) {
-    return await requestUserConfirmation(sessionId, toolName, args);
-  }
-
+  // ── 对标 pi agent：L2 / L3 模式下所有工具 100% 自动执行 ──
   return { allow: true };
 }
 

@@ -15,10 +15,10 @@ export const tokens = `
   --text-2: #515156;
   --text-3: #a1a1aa;
   --text-4: #c4c4c8;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-soft: rgba(99, 102, 241, 0.08);
-  --accent-border: rgba(99, 102, 241, 0.2);
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.08);
+  --accent-border: rgba(37, 99, 235, 0.2);
   --green: #16a34a;
   --green-soft: #f0fdf4;
   --green-border: #bbf7d0;
@@ -32,15 +32,15 @@ export const tokens = `
   --blue-border: #bfdbfe;
   --blue-text: #1e40af;
   --blue-accent: #3b82f6;
-  --brand-gradient: linear-gradient(135deg, #818cf8, #6366f1 60%, #a78bfa);
-  --brand-shadow: 0 2px 6px rgba(99,102,241,.2);
+  --brand-gradient: linear-gradient(135deg, #0284c7, #2563eb 60%, #1d4ed8);
+  --brand-shadow: 0 2px 6px rgba(37,99,235,.2);
   --code-bg: #18181b;
   --code-text: #e4e4e7;
   --overlay: rgba(0,0,0,.28);
   --bg-dropdown: rgba(255, 255, 255, 0.85);
   --scrollbar: #d4d4d8;
   --scrollbar-hover: #a1a1aa;
-  --selection: #c7d2fe;
+  --selection: #bfdbfe;
   --shadow-sm: 0 1px 2px rgba(16,17,20,.05);
   --shadow-md: 0 4px 14px rgba(16,17,20,.06);
   --shadow-lg: 0 12px 36px rgba(16,17,20,.08);
@@ -49,7 +49,7 @@ export const tokens = `
   --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --cat-c: #ef4444;
   --cat-p: #3b82f6;
-  --cat-a: #8b5cf6;
+  --cat-a: #0284c7;
   --cat-u: #f59e0b;
 }
 :root[data-theme="dark"] {
@@ -65,10 +65,10 @@ export const tokens = `
   --text-2: rgba(255,255,255,.65);
   --text-3: rgba(255,255,255,.45);
   --text-4: rgba(255,255,255,.25);
-  --accent: #818cf8;
-  --accent-hover: #6366f1;
-  --accent-soft: rgba(129, 140, 248, 0.12);
-  --accent-border: rgba(129, 140, 248, 0.3);
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.12);
+  --accent-border: rgba(59, 130, 246, 0.3);
   --green: #4ed88a;
   --green-soft: rgba(22,163,74,.15);
   --green-border: rgba(78,216,138,.3);
@@ -82,15 +82,15 @@ export const tokens = `
   --blue-border: rgba(59,130,246,.3);
   --blue-text: #60a5fa;
   --blue-accent: #60a5fa;
-  --brand-gradient: linear-gradient(135deg, #818cf8, #6366f1 60%, #a78bfa);
-  --brand-shadow: 0 2px 6px rgba(99,102,241,.3);
+  --brand-gradient: linear-gradient(135deg, #38bdf8, #3b82f6 60%, #1d4ed8);
+  --brand-shadow: 0 2px 6px rgba(59,130,246,.3);
   --code-bg: #0d0d0f;
   --code-text: #e4e4e7;
   --overlay: rgba(0,0,0,.5);
   --bg-dropdown: rgba(18, 18, 20, 0.82);
   --scrollbar: #3f4248;
   --scrollbar-hover: #52555c;
-  --selection: rgba(99,102,241,.3);
+  --selection: rgba(59,130,246,.3);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
   --shadow-md: 0 4px 14px rgba(0,0,0,.35);
   --shadow-lg: 0 12px 36px rgba(0,0,0,.4);

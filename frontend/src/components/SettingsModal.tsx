@@ -6,6 +6,7 @@ import {
   ChevronRight, Lock, Activity, FileText, Terminal, Globe, Plus
 } from "lucide-react";
 import "./SettingsModal.css";
+import { PiLogo } from "./PiLogo";
 
 type TabId =
   | "account"
@@ -1146,9 +1147,9 @@ export default function SettingsModal() {
             <h2 className="settings-content-title">帮助与反馈</h2>
             <div className="settings-section help-section">
               <div className="app-logo-section">
-                <div className="logo-badge">Pi-a</div>
+                <PiLogo size={64} style={{ marginBottom: 12 }} />
                 <h3 className="app-name-large">Pi-a Desktop</h3>
-                <p className="app-version-txt">版本 v0.0.1 (Official Build)</p>
+                <p className="app-version-txt">版本 v2.0 (Official Build)</p>
               </div>
               <div className="divider-line" />
               <div className="help-links-list">

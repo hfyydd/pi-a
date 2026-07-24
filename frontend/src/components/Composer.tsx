@@ -1,6 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { useStore, type RunMode, type PermLevel } from "../store/useStore";
-import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, Zap, Shield } from "lucide-react";
+import { FolderOpen, ChevronDown, Plus, Search, FolderInput, Settings2, Sparkles, Zap, Shield, X } from "lucide-react";
+
+interface ActiveSkillTag {
+  cmd: string;
+  name: string;
+  icon: string;
+}
 
 interface CombinedOption {
   key: string;
@@ -33,6 +39,164 @@ const COMBINED_OPTIONS: CombinedOption[] = [
   },
 ];
 
+interface SlashCommand {
+  cmd: string;
+  name: string;
+  desc: string;
+  icon: string;
+  category: "skill" | "mode" | "action";
+  action: (text: string, setText: (t: string) => void) => void;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    cmd: "/ego-browser",
+    name: "ego-browser 浏览器自动化",
+    desc: "使用 Chromium 浏览器环境进行网页自动化、截图、表单与数据抓取",
+    icon: "🌐",
+    category: "skill",
+    action: (_, setText) => setText("请使用 ego-browser 帮我打开网站并进行自动化操作："),
+  },
+  {
+    cmd: "/ppt-generator-pro",
+    name: "PPT 高级制作技能",
+    desc: "AI 自动生成高质量 PPT 图片与演示，支持智能转场与交互播放",
+    icon: "🎞️",
+    category: "skill",
+    action: (_, setText) => setText("请使用 ppt-generator-pro 帮我生成一套高保真演示幻灯片："),
+  },
+  {
+    cmd: "/weekly-report",
+    name: "工作周报生成技能",
+    desc: "搜集 Git 提交与项目进展，生成结构化 Word 周报",
+    icon: "📝",
+    category: "skill",
+    action: (_, setText) => setText("请帮我整理并生成一份本周工作周报 Word 文档"),
+  },
+  {
+    cmd: "/data-analysis",
+    name: "数据分析技能",
+    desc: "读取表格数据 (xlsx/csv) 并生成分析图表摘要",
+    icon: "📊",
+    category: "skill",
+    action: (_, setText) => setText("请帮我读取并分析桌面上的数据表格文件"),
+  },
+  {
+    cmd: "/presentation",
+    name: "PPT 演示生成技能",
+    desc: "根据主题生成多页 PPT 演示文稿",
+    icon: "🎨",
+    category: "skill",
+    action: (_, setText) => setText("请帮我根据最近项目成果制作一份 PPT 演示文稿"),
+  },
+  {
+    cmd: "/modern-web-guidance",
+    name: "现代 Web 规范指南",
+    desc: "针对 HTML/CSS/React 提供现代前端最佳实践与 API 规范",
+    icon: "🚀",
+    category: "skill",
+    action: (_, setText) => setText("请按照现代 Web 最佳实践为我设计前端界面与组件："),
+  },
+  {
+    cmd: "/chrome-extensions",
+    name: "Chrome 扩展开发技能",
+    desc: "构建与发布 Manifest V3 标准的 Chrome 浏览器插件",
+    icon: "🧩",
+    category: "skill",
+    action: (_, setText) => setText("请帮我设计一个 Manifest V3 的 Chrome 浏览器扩展："),
+  },
+  {
+    cmd: "/polish-writing",
+    name: "文档润色技能",
+    desc: "润色和优化文本文档结构与用词",
+    icon: "✍️",
+    category: "skill",
+    action: (_, setText) => setText("请帮我润色和优化以下文档内容："),
+  },
+  {
+    cmd: "/doc-qa",
+    name: "文档问答技能",
+    desc: "针对文档内容进行精准问答与引用",
+    icon: "❓",
+    category: "skill",
+    action: (_, setText) => setText("请结合文档回答我以下问题："),
+  },
+  {
+    cmd: "/brainstorm",
+    name: "Brainstorm (Superpowers)",
+    desc: "发散思考模式：从多角度评估 3-5 种潜在方案，对比可行性与优缺点",
+    icon: "🧠",
+    category: "mode",
+    action: (_, setText) => {
+      setText("/brainstorm ");
+    },
+  },
+  {
+    cmd: "/plan",
+    name: "Plan (Superpowers 方案)",
+    desc: "方案拆解模式：制定模块架构与分步执行清单",
+    icon: "📋",
+    category: "mode",
+    action: (_, setText) => {
+      useStore.getState().setMode("plan");
+      setText("/plan ");
+    },
+  },
+  {
+    cmd: "/implement",
+    name: "Implement (Superpowers)",
+    desc: "精准落地模式：高效编写代码或生成工件，同步进行验证",
+    icon: "⚡",
+    category: "mode",
+    action: (_, setText) => {
+      useStore.getState().setMode("craft");
+      setText("/implement ");
+    },
+  },
+  {
+    cmd: "/subagent",
+    name: "派发子代理 (pi-subagents)",
+    desc: "在后台独立上下文派发子任务，不占用当前主窗口",
+    icon: "🤖",
+    category: "action",
+    action: (_, setText) => {
+      setText("/subagent 请在后台帮我执行以下独立任务：");
+    },
+  },
+  {
+    cmd: "/goal",
+    name: "Goal (目标强校验模式)",
+    desc: "目标驱动模式：持续推演并验证，直到调用 goal_complete 凭据闭环",
+    icon: "🎯",
+    category: "mode",
+    action: (_, setText) => {
+      setText("/goal ");
+    },
+  },
+  {
+    cmd: "/craft",
+    name: "Craft 模式",
+    desc: "切换到 Craft 直接执行模式 (读写与命令)",
+    icon: "🛠️",
+    category: "mode",
+    action: (_, setText) => {
+      useStore.getState().setMode("craft");
+      setText("");
+    },
+  },
+  {
+    cmd: "/ask",
+    name: "Ask 模式",
+    desc: "切换到 Ask 纯文本问答模式",
+    icon: "💬",
+    category: "mode",
+    action: (_, setText) => {
+      useStore.getState().setMode("ask");
+      setText("");
+    },
+  },
+];
+
 function getActiveOptionKey(permission: PermLevel): string {
   if (permission === "full" || permission === "L3") return "full";
   return "default";
@@ -44,6 +208,10 @@ export default function Composer() {
           workspaces, composerWorkspaceId, setComposerWorkspaceId,
           setShowWorkspaceManager } = useStore();
   const [text, setText] = useState("");
+  const [activeSkillTag, setActiveSkillTag] = useState<ActiveSkillTag | null>(null);
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+
   const runningSubAgent = conversations.find(
     c => c.parentId === currentConvId && c.status === "running"
   );
@@ -73,9 +241,13 @@ export default function Composer() {
   const handleSend = () => {
     if (busy) { abortGeneration(); return; }
     const t = text.trim();
-    if (!t) return;
+    if (!t && !activeSkillTag) return;
+    const fullMessage = activeSkillTag
+      ? `${activeSkillTag.cmd} ${t}`
+      : t;
     setText("");
-    sendMessage(t);
+    setActiveSkillTag(null);
+    sendMessage(fullMessage);
   };
 
   // 当前选中的空间名
@@ -91,6 +263,20 @@ export default function Composer() {
   const activeOpt = COMBINED_OPTIONS.find(o => o.key === activeKey) || COMBINED_OPTIONS[0];
   const ActiveIcon = activeOpt.icon;
 
+  const filteredSlashCmds = slashQuery !== null
+    ? SLASH_COMMANDS.filter(c => c.cmd.toLowerCase().includes("/" + slashQuery) || c.name.toLowerCase().includes(slashQuery))
+    : [];
+
+  const handleSelectSlashCmd = (cmd: SlashCommand) => {
+    if (cmd.category === "skill") {
+      setActiveSkillTag({ cmd: cmd.cmd, name: cmd.name, icon: cmd.icon });
+      setText((prev) => prev.replace(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/, "").trimStart());
+    } else {
+      cmd.action(text, setText);
+    }
+    setSlashQuery(null);
+  };
+
   return (
     <div style={{ flexShrink: 0, padding: "8px 28px 16px", background: "linear-gradient(to top, var(--bg) 65%, transparent)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", position: "relative" }}>
@@ -100,6 +286,118 @@ export default function Composer() {
           borderRadius: 16, boxShadow: "var(--shadow-md)",
           display: "flex", flexDirection: "column", position: "relative",
         }}>
+          {/* ── 激活的 Skill 标签 Chip (Atomic Skill Badge) ── */}
+          {activeSkillTag && (
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "3px 10px",
+              margin: "10px 14px 2px",
+              background: "var(--accent-soft)",
+              border: "1px solid var(--accent-border)",
+              borderRadius: 16,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "var(--accent)",
+              width: "fit-content",
+              userSelect: "none",
+            }}>
+              <span>{activeSkillTag.icon}</span>
+              <span>{activeSkillTag.cmd}</span>
+              <span style={{ fontSize: 10, opacity: 0.75 }}>({activeSkillTag.name})</span>
+              <button
+                onClick={() => setActiveSkillTag(null)}
+                title="删除技能标签 (Backspace)"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "currentColor",
+                  cursor: "pointer",
+                  padding: 0,
+                  marginLeft: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  opacity: 0.8,
+                }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          {/* ── 斜杠技能菜单 (Slash Skill Menu) ── */}
+          {slashQuery !== null && filteredSlashCmds.length > 0 && (
+            <div style={{
+              position: "absolute",
+              bottom: "calc(100% + 8px)",
+              left: 0,
+              right: 0,
+              background: "var(--bg)",
+              backdropFilter: "blur(16px) saturate(180%)",
+              WebkitBackdropFilter: "blur(16px) saturate(180%)",
+              border: "1px solid var(--border-strong)",
+              borderRadius: 14,
+              boxShadow: "0 12px 36px rgba(0,0,0,0.35)",
+              padding: 6,
+              zIndex: 99999,
+              maxHeight: 300,
+              overflowY: "auto",
+            }}>
+              <div style={{ fontSize: 11, color: "var(--text-3)", padding: "6px 10px 6px", borderBottom: "1px solid var(--border)", marginBottom: 4, display: "flex", justifyContent: "space-between" }}>
+                <span>⚡ 快捷技能与系统指令</span>
+                <span>Tab / Enter 选中 · Esc 退出</span>
+              </div>
+              {filteredSlashCmds.map((cmd, idx) => {
+                const isFirstOfCategory = idx === 0 || filteredSlashCmds[idx - 1].category !== cmd.category;
+                const categoryLabel = cmd.category === "skill" ? "🎯 内置技能 (Skills)" : "🎛️ 系统模式 (Modes)";
+
+                return (
+                  <Fragment key={cmd.cmd}>
+                    {isFirstOfCategory && (
+                      <div style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: "var(--text-3)",
+                        padding: "6px 10px 2px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px"
+                      }}>
+                        {categoryLabel}
+                      </div>
+                    )}
+                    <div
+                      onClick={() => handleSelectSlashCmd(cmd)}
+                      onMouseEnter={() => setSlashIndex(idx)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background: idx === slashIndex ? "var(--bg-hover)" : "transparent",
+                        transition: "background 0.1s ease",
+                      }}
+                    >
+                      <span style={{ fontSize: 16 }}>{cmd.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: idx === slashIndex ? "var(--accent)" : "var(--text)", display: "flex", gap: 6, alignItems: "center" }}>
+                          <span>{cmd.cmd}</span>
+                          <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: "normal" }}>({cmd.name})</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {cmd.desc}
+                        </div>
+                      </div>
+                      {idx === slashIndex && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>↵ 选择</span>}
+                    </div>
+                  </Fragment>
+                );
+              })}
+            </div>
+          )}
+
           {runningSubAgent && (
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
@@ -116,8 +414,41 @@ export default function Composer() {
           <textarea
             ref={textareaRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setText(val);
+              const m = val.match(/(?:^|\s)\/([a-zA-Z0-9_-]*)$/);
+              if (m) {
+                setSlashQuery(m[1].toLowerCase());
+                setSlashIndex(0);
+              } else {
+                setSlashQuery(null);
+              }
+            }}
             onKeyDown={(e) => {
+              if (e.key === "Backspace" && activeSkillTag && text === "") {
+                e.preventDefault();
+                setActiveSkillTag(null);
+                return;
+              }
+              if (slashQuery !== null && filteredSlashCmds.length > 0) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setSlashIndex((prev) => (prev + 1) % filteredSlashCmds.length);
+                  return;
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setSlashIndex((prev) => (prev - 1 + filteredSlashCmds.length) % filteredSlashCmds.length);
+                  return;
+                } else if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSelectSlashCmd(filteredSlashCmds[slashIndex]);
+                  return;
+                } else if (e.key === "Escape") {
+                  setSlashQuery(null);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
             }}
             placeholder={busy ? "Pi-a 思考中…" : "今天帮你做些什么？@ 引用对话文件，/ 调用技能与指令"}

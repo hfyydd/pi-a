@@ -10,8 +10,8 @@ import { webFetchTool, webSearchTool } from "./web.ts";
 import { screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, computerTool } from "./os.ts";
 import { indexDocTool, searchDocsTool } from "./rag.ts";
 import { taskTool } from "./task.ts";
-import { sandboxedBashTool } from "./sandbox.ts";
 import { callSubagentTool } from "./subagent.ts";
+import { goalCompleteTool } from "./goal.ts";
 import { askUserQuestionTool } from "./ask.ts";
 import { connectCloudServiceTool } from "./connect_cloud_service.ts";
 
@@ -25,16 +25,13 @@ export function setMcpTools(tools: AgentTool<any>[]): void {
   mcpTools = tools;
 }
 
-/** 全量工具（Craft 模式）：pi 的 read/bash/edit/write + memory + 文档 + 联网 + MCP */
+/** 全量工具（Craft 模式）：pi 原生 read/bash/edit/write + memory + 文档 + 联网 + MCP */
 export function getFullTools(): AgentTool<any>[] {
-  const rawCodingTools = createCodingTools(HOME); // read, bash, edit, write
-  const codingTools = [
-    ...rawCodingTools.filter(t => t.name !== "bash"),
-    sandboxedBashTool
-  ];
+  const codingTools = createCodingTools(HOME); // pi 原生 read, bash, edit, write 工具
   return [
     ...codingTools,
     callSubagentTool,
+    goalCompleteTool,
     memoryRecallTool,
     memoryWriteTool,
     readDocTool,
@@ -77,4 +74,4 @@ export function getTools(): AgentTool<any>[] {
   return getFullTools();
 }
 
-export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, computerTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, sandboxedBashTool, callSubagentTool, askUserQuestionTool, connectCloudServiceTool };
+export { memoryRecallTool, memoryWriteTool, readDocTool, writeDocxTool, writeXlsxTool, writePptxTool, editDocxTool, editXlsxTool, editDocxFreeTool, editPptxTool, webFetchTool, webSearchTool, computerTool, screenshotTool, mouseClickTool, mouseMoveTool, keyTypeTool, appFocusTool, cursorPosTool, indexDocTool, searchDocsTool, callSubagentTool, askUserQuestionTool, connectCloudServiceTool };

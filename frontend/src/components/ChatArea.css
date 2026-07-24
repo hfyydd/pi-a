@@ -1,7 +1,7 @@
 /* ChatArea 组件样式（照 WorkBuddy 模式） */
 
 .chat-header {
-  height: 80px;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -10,11 +10,6 @@
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
   box-sizing: border-box;
-}
-
-.mac-window .chat-header {
-  height: 104px;
-  padding-top: 36px;
 }
 
 .tool-spin { animation: tool-spin 0.9s linear infinite; }
@@ -30,7 +25,7 @@
   word-break: break-word; font-size: 14px; line-height: 1.55;
   white-space: pre-wrap;
   border: none;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12);
+  box-shadow: var(--brand-shadow);
 }
 .userMessageBubble p { margin: 0; }
 .userMessageBubble p:last-child { margin-bottom: 0; }
@@ -249,7 +244,116 @@
   cursor: pointer; transition: all .15s;
 }
 .welcome-subtab:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border); }
+.welcome-subtab.active {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  font-weight: 600;
+}
 .welcome-subtab-icon { flex-shrink: 0; }
+
+/* 场景卡片网格 */
+.welcome-scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 20px;
+}
+
+.welcome-scenario-card {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.welcome-scenario-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.scenario-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.scenario-icon {
+  font-size: 16px;
+}
+
+.scenario-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scenario-skill-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent-border);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.scenario-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.scenario-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.scenario-action-hint {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.scenario-run-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.welcome-scenario-card:hover .scenario-run-btn {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
 
 /* 消息功能按钮操作条 (复制、评分、朗读、分享) */
 .message-action-row {
@@ -309,7 +413,7 @@
 }
 
 .action-btn.active-speak {
-  color: #a855f7; /* 紫色 */
+  color: var(--accent);
   animation: speak-pulse 1.5s infinite ease-in-out;
 }
 

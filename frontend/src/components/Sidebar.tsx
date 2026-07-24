@@ -2,17 +2,17 @@ import { useState, useMemo, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
   Search, Plus, Settings, PanelLeft, Sun, Moon,
-  Star, Cog, Trash2, MoreHorizontal, FolderInput, SlidersHorizontal,
-  ChevronDown, ChevronRight, X, RotateCcw, Check,
+  Trash2, MoreHorizontal, FolderInput, SlidersHorizontal,
+  ChevronDown, ChevronRight, X, RotateCcw, Check, Sparkles, Cog,
 } from "lucide-react";
 import "./Sidebar.css";
 import { WorkspaceIcon } from "./WorkspaceIcon";
+import { PiLogo } from "./PiLogo";
 import { t } from "../utils/i18n";
 
-const CATEGORIES = [
-  { id: "assistant", labelKey: "assistant_mode", labelFallback: "💬 对话", icon: Star, color: "var(--cat-p)", enabled: true },
-  { id: "expert", labelKey: "experts_skills", labelFallback: "🎓 专家", icon: Star, color: "var(--cat-c)", enabled: true },
-  { id: "automation", labelKey: "automation", labelFallback: "🤖 自动化", icon: Cog, color: "var(--cat-u)", enabled: true },
+const FEATURE_TABS = [
+  { id: "expert", labelKey: "experts_skills", labelFallback: "🎓 专家与技能", icon: Sparkles, color: "#0284c7" },
+  { id: "automation", labelKey: "automation", labelFallback: "🤖 自动化", icon: Cog, color: "#0d9488" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -252,15 +252,13 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
   // 各空间的会话计数
   const spaceTotal = workspaces.reduce((sum, ws) => sum + (spaceMap.get(ws.id)?.length || 0), 0);
 
-  const isMac = useMemo(() => navigator.userAgent.includes("Mac"), []);
-
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      {/* ── 标题栏 (无标题栏/透明标题栏适配) ── */}
+      {/* ── 标题栏 ── */}
       <div className="sidebar-header-container">
         <div className="sidebar-top-row">
-          {isMac && <div className="sidebar-traffic-lights-spacer" />}
           <div className="sidebar-brand-row">
+            <PiLogo size={22} />
             <span className="sidebar-brand-name">Pi-a</span>
             <span className="sidebar-brand-version">v2.0</span>
           </div>
@@ -294,27 +292,12 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
         </button>
       </div>
 
-      {/* ── 分类导航 ── */}
+      {/* ── 规则与功能导览（专家技能 + 自动化，去除多余的对话助手切页） ── */}
       <nav className="sidebar-nav">
-        {CATEGORIES.map((cat) => {
+        {FEATURE_TABS.map((cat) => {
           const Icon = cat.icon;
           const active = activeCategory === cat.id;
           const label = t(cat.labelKey);
-          if (!cat.enabled) {
-            return (
-              <button
-                key={cat.id}
-                className="sidebar-nav-item disabled"
-                onClick={() => alert(`${label} function is under development`)}
-              >
-                <span className="sidebar-nav-icon" style={{ color: "var(--text-4)" }}>
-                  <Icon size={17} />
-                </span>
-                <span className="sidebar-nav-label">{label}</span>
-                <span className="sidebar-nav-badge">Soon</span>
-              </button>
-            );
-          }
           return (
             <button
               key={cat.id}
@@ -322,7 +305,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               onClick={() => setCategory(cat.id)}
             >
               <span className="sidebar-nav-icon" style={{ color: cat.color }}>
-                <Icon size={17} />
+                <Icon size={16} />
               </span>
               <span className="sidebar-nav-label">{label}</span>
             </button>

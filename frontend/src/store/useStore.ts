@@ -154,6 +154,9 @@ interface AppState {
   setShowSettings: (v: boolean) => void;
   setShowArtifacts: (v: boolean) => void;
   setShowWorkspaceManager: (v: boolean) => void;
+  showCommandPalette: boolean;
+  setShowCommandPalette: (v: boolean) => void;
+  setModel: (provider: string, modelId: string) => void;
   setComposerWorkspaceId: (id: string | null) => void;
 
   // 工作空间
@@ -210,7 +213,7 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   busy: false,
   mode: "craft",
-  permission: "default",
+  permission: "full",
   theme: "light",
   pendingConfirm: null,
 
@@ -244,6 +247,9 @@ export const useStore = create<AppState>((set, get) => ({
   showSettings: false,
   showArtifacts: false,
   showWorkspaceManager: false,
+  showCommandPalette: false,
+  setShowCommandPalette: (v) => set({ showCommandPalette: v }),
+  setModel: (provider, modelId) => set({ modelProvider: provider, modelId }),
   _pendingDirPath: null,
 
   settings: {

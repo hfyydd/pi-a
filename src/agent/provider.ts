@@ -138,15 +138,38 @@ export class LocalPiProvider implements AgentProvider {
     // 按模式切换工具集 + 系统提示
     const agent = entry.handle.agent;
     agent.state.tools = toolsForMode(o.mode);
-    const basePrompt = agent.state.systemPrompt.split("\n\n【当前模式")[0]; // 去掉旧的模式标记
-    agent.state.systemPrompt = basePrompt + MODE_PROMPTS[o.mode];
+    const basePrompt = agent.state.systemPrompt.split("\n\n【当前模式")[0].split("\n\n【斜杠技能强激活")[0]; // 去掉旧的模式/技能标记
+    
+    // 解析斜杠技能/Superpowers/Goal强激活 (/brainstorm /plan /implement /goal /ego-browser ...)
+    let skillPromptAddon = "";
+    const slashSkillMatch = text.match(/^\/([a-zA-Z0-9_-]+)(?:\s+([\s\S]*))?$/);
+    if (slashSkillMatch) {
+      const cmd = slashSkillMatch[1].toLowerCase();
+      if (cmd === "brainstorm") {
+        skillPromptAddon = "\n\n【Superpowers 思考工作流：/brainstorm 头脑风暴阶段】请从多角度提出 3-5 种潜在方案，对比可行性、复杂度与优缺点，暂不急于修改或写代码。";
+      } else if (cmd === "plan") {
+        skillPromptAddon = "\n\n【Superpowers 思考工作流：/plan 方案拆解阶段】请制定清晰的模块架构与分步执行清单，明确前置条件与验证断言，等待方案确定。";
+      } else if (cmd === "implement") {
+        skillPromptAddon = "\n\n【Superpowers 思考工作流：/implement 精准落地阶段】请严格按照方案清单，高效调用工具输出高质量代码/工件，并同步进行回归验证。";
+      } else if (cmd === "goal") {
+        skillPromptAddon = "\n\n【pi-goal 目标驱动强校验模式：/goal】在此模式下，你必须持续推进并验证交付物（通过代码断言、文件校验或运行结果），最终主动调用 `goal_complete` 工具提交凭据证明目标真正闭环。";
+      } else if (cmd === "subagent") {
+        skillPromptAddon = "\n\n【子代理派发指示：/subagent】请优先调用 `subagent` 工具在后台派发独立 Context 子代理并行处理此任务。";
+      } else {
+        skillPromptAddon = `\n\n【斜杠技能强激活：${cmd}】用户已显式使用 /${cmd} 调起此技能。请优先使用和遵循 <skills> 中 ${cmd} 技能定义的工作流。`;
+      }
+    }
+
+    agent.state.systemPrompt = basePrompt + MODE_PROMPTS[o.mode] + skillPromptAddon;
 
     // 记录权限级别，供 beforeToolCall 钩子读取（见 engine.ts 的权限注入）
     (agent as any).__perm = o.permission;
     (agent as any).__sessionId = sessionId;
 
-    // 标记会话为运行中
-    updateConversationStatus(sessionId, "running");
+    if (agent.state.isStreaming) {
+      agent.abort();
+      await new Promise((r) => setTimeout(r, 50));
+    }
 
     sessionContext.run({ sessionId }, () => {
       agent.prompt(text).then(() => {

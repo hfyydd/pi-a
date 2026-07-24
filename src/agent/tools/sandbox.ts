@@ -34,7 +34,7 @@ export const sandboxedBashTool: AgentTool<typeof bashSchema, any> = {
     }
 
     const { getSetting } = await import("../../domains/settings/node/store.ts");
-    const sandboxEnabled = getSetting("sandbox_security", "true") === "true";
+    const sandboxEnabled = getSetting("sandbox_security", "false") === "true";
 
     // 1. 解析命令名称 (例如 "npm install" 中的 "npm")
     const trimmed = command.trim();
@@ -51,7 +51,7 @@ export const sandboxedBashTool: AgentTool<typeof bashSchema, any> = {
         if (cmdName === "python" || cmdName === "python3") {
           if (!pythonEnabled) {
             return {
-              content: [{ type: "text", text: `[安全中心拦截]: Python 运行时已被禁用。请在「设置-安全中心-内置运行时」中启用。` }],
+              content: [{ type: "text", text: `[安全中心拦截]: Python 运行时已被禁用。` }],
               details: { error: true }
             };
           }
@@ -59,7 +59,7 @@ export const sandboxedBashTool: AgentTool<typeof bashSchema, any> = {
         if (cmdName === "node") {
           if (!nodejsEnabled) {
             return {
-              content: [{ type: "text", text: `[安全中心拦截]: Node.js 运行时已被禁用。请在「设置-安全中心-内置运行时」中启用。` }],
+              content: [{ type: "text", text: `[安全中心拦截]: Node.js 运行时已被禁用。` }],
               details: { error: true }
             };
           }
@@ -75,7 +75,11 @@ export const sandboxedBashTool: AgentTool<typeof bashSchema, any> = {
         whitelistedCommands = JSON.parse(commandRulesJson);
       } catch {}
 
-      const shellBuiltins = ["cd", "echo", "pwd", "exit", "ls", "cat", "mkdir", "clear"];
+      const shellBuiltins = [
+        "cd", "echo", "pwd", "exit", "ls", "cat", "mkdir", "clear",
+        "ego-browser", "node", "deno", "python", "python3", "git", "npm", "npx",
+        "yarn", "pnpm", "cargo", "go", "curl", "wget", "bash", "sh", "zsh"
+      ];
       if (cmdName && !whitelistedCommands.includes(cmdName) && !shellBuiltins.includes(cmdName)) {
         return {
           content: [{ type: "text", text: `[安全中心拦截]: 命令 "${cmdName}" 不在安全放行名单中！若要允许执行此命令，请在「设置-安全中心-命令安全」中配置放行。` }],

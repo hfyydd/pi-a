@@ -14,7 +14,7 @@ deno run --allow-read --allow-write scripts/gen-frontend.ts
 
 # 3) 后台启动桌面 App：deno desktop 会先打包（产出 Pi-a.app）再运行，
 #    用 nohup + 子 shell 让其脱离当前 shell 常驻，窗口随用户操作独立存活。
-( nohup deno desktop --output Pi-a.app \
+( nohup deno desktop --output Pi-a.app --icon resources/app-icon.png \
     --allow-read --allow-write --allow-env --allow-net \
     --allow-ffi --allow-sys --allow-run --allow-scripts main.ts \
     > /tmp/pi-a-app.log 2>&1 & )

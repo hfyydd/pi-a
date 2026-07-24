@@ -41,11 +41,13 @@
   transition: opacity 0.22s ease;
 }
 
-/* ===== 标题栏 (透明标题栏适配) ===== */
+/* ===== 标题栏 ===== */
 .sidebar-header-container {
   display: flex;
   flex-direction: column;
-  padding: 10px 10px 8px 12px;
+  justify-content: center;
+  height: 56px;
+  padding: 0 10px 0 12px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-soft);
   -webkit-app-region: drag;
@@ -55,21 +57,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-}
-
-.sidebar-traffic-lights-spacer {
-  width: 68px; /* 适配 macOS 交通灯宽度 */
-  height: 100%;
-  flex-shrink: 0;
-  pointer-events: none;
-  -webkit-app-region: drag;
+  height: 30px;
 }
 
 .sidebar-top-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   margin-left: auto;
   -webkit-app-region: no-drag;
 }
@@ -90,22 +84,26 @@
 .sidebar-brand-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-left: 2px;
+  gap: 6px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
 }
 
 .sidebar-brand-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-brand-version {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--text-4);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 99px;
+  line-height: 1.2;
 }
 
 /* ===== 新建任务按钮 ===== */

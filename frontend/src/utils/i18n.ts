@@ -2,6 +2,7 @@ import { useStore } from "../store/useStore";
 
 const translations: Record<string, Record<string, string>> = {
   "zh-CN": {
+    "assistant_mode": "💬 助手对话",
     "new_task": "新建任务",
     "tasks": "任务",
     "spaces": "空间",
@@ -43,6 +44,7 @@ const translations: Record<string, Record<string, string>> = {
     "days_ago": "天前",
   },
   "en-US": {
+    "assistant_mode": "💬 Assistant",
     "new_task": "New Task",
     "tasks": "Tasks",
     "spaces": "Spaces",
