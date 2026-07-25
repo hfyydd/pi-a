@@ -49,7 +49,7 @@ export interface DisplayMetrics {
   scaleFactor: number;
 }
 
-/** 获取 macOS 屏幕分辨率与 Retina 缩放倍率 */
+/** 获取 macOS 屏幕分辨率与 Retina 缩放倍率（纯静默检测，绝对不出 screencapture 触发系统弹窗） */
 export async function getDisplayMetrics(): Promise<DisplayMetrics> {
   try {
     const script = `
@@ -62,15 +62,7 @@ export async function getDisplayMetrics(): Promise<DisplayMetrics> {
     const m = out.match(/(\d+)x(\d+)/);
     const logicalW = m ? parseInt(m[1], 10) : 1440;
     const logicalH = m ? parseInt(m[2], 10) : 900;
-
-    // 获取一次快速全屏截图来检测真实物理像素
-    await ensureShotsDir();
-    const probePath = `${SHOTS_DIR}/probe-metrics.png`;
-    await runCmd("screencapture", ["-x", probePath]);
-    const stat = await Deno.stat(probePath);
-    // 判断 Retina 常用比例 (如果文件较大型号且分辨率超 2000 则默认为 2.0x 逻辑换算)
-    const scaleFactor = (stat.size > 800000 && logicalW < 2000) ? 2.0 : 1.0;
-    try { await Deno.remove(probePath); } catch {}
+    const scaleFactor = logicalW <= 2000 ? 2.0 : 1.0;
 
     return { width: logicalW, height: logicalH, scaleFactor };
   } catch {
