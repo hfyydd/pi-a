@@ -1003,29 +1003,15 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           } catch {}
         }
 
-        // 2. 屏幕录制检测 (CGPreflightScreenCaptureAccess + 静默 1x1 截图探针双重检测)
+        // 2. 屏幕录制检测 (纯 C API 静默检查 CGPreflightScreenCaptureAccess，绝对不出主动截屏触发系统的强行弹窗)
         try {
           const coreGraphics = Deno.dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", {
             CGPreflightScreenCaptureAccess: { parameters: [], result: "bool" },
           });
           screenRecordingGranted = coreGraphics.symbols.CGPreflightScreenCaptureAccess();
           coreGraphics.close();
-        } catch {}
-
-        if (!screenRecordingGranted) {
-          try {
-            const probePath = `/tmp/screen_probe_${Date.now()}.png`;
-            const cmd = new Deno.Command("screencapture", {
-              args: ["-x", "-R0,0,1,1", probePath],
-              stdout: "null", stderr: "null"
-            });
-            const r = await cmd.output();
-            if (r.code === 0) {
-              const stat = await Deno.stat(probePath);
-              if (stat.size > 0) screenRecordingGranted = true;
-              await Deno.remove(probePath);
-            }
-          } catch {}
+        } catch {
+          screenRecordingGranted = true;
         }
       } else {
         accessibilityGranted = true;
