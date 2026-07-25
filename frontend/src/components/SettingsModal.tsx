@@ -643,24 +643,6 @@ export default function SettingsModal() {
                 </div>
               </div>
 
-              {/* 单次输出最大 Token */}
-              <div className="settings-item-card">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">单次输出限制 (Max Tokens)</label>
-                  <p className="settings-item-desc">限制智能体单次回答能产生的最大 Token 数量。</p>
-                </div>
-                <div className="settings-item-control">
-                  <select
-                    className="settings-select"
-                    value={settings.agentMaxTokens || "4096"}
-                    onChange={(e) => updateSettings({ agentMaxTokens: e.target.value })}
-                  >
-                    <option value="2048">2048 Tokens</option>
-                    <option value="4096">4096 Tokens</option>
-                    <option value="8192">8192 Tokens</option>
-                  </select>
-                </div>
-              </div>
             </div>
           </div>
         );
