@@ -1003,15 +1003,12 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
           } catch {}
         }
 
-        // 2. 屏幕录制检测 (CGPreflightScreenCaptureAccess + CGRequestScreenCaptureAccess + Accessibility 强信号三重静默检测)
+        // 2. 屏幕录制检测 (仅使用 CGPreflightScreenCaptureAccess 纯静默查询，绝不调用 CGRequestScreenCaptureAccess 诱发系统弹窗)
         try {
           const coreGraphics = Deno.dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", {
             CGPreflightScreenCaptureAccess: { parameters: [], result: "bool" },
-            CGRequestScreenCaptureAccess: { parameters: [], result: "bool" },
           });
-          const preflight = coreGraphics.symbols.CGPreflightScreenCaptureAccess();
-          const request = coreGraphics.symbols.CGRequestScreenCaptureAccess();
-          screenRecordingGranted = preflight || request || accessibilityGranted;
+          screenRecordingGranted = coreGraphics.symbols.CGPreflightScreenCaptureAccess();
           coreGraphics.close();
         } catch {
           screenRecordingGranted = true;
