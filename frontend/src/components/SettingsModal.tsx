@@ -832,14 +832,19 @@ export default function SettingsModal() {
                       return (
                         <div key={provider.id} className={`provider-model-card ${hasKey ? "configured" : "unconfigured"}`}>
                           <div className="provider-card-header">
-                            <h4 className="provider-name">{provider.name}</h4>
+                            <h4 className="provider-name">
+                              <span>
+                                {provider.id === "deepseek" ? "⚡" : provider.id === "zhipu" ? "🧠" : provider.id === "moonshot" ? "🌙" : provider.id === "openai" ? "🤖" : provider.id === "anthropic" ? "🔮" : provider.id === "google" ? "🌐" : provider.id === "qwen" ? "🌟" : "🔹"}
+                              </span>
+                              <span>{provider.name}</span>
+                            </h4>
                             <span className={`provider-status-badge ${hasKey ? "ok" : "warn"}`}>
-                              {hasKey ? "已配置 Key" : "未配置 Key"}
+                              {hasKey ? "已就绪" : "未配置"}
                             </span>
                           </div>
 
                           {/* API Key 密码卡片 */}
-                          <div className="settings-input-password-wrapper" style={{ marginTop: 8 }}>
+                          <div className="settings-input-password-wrapper" style={{ marginTop: 6 }}>
                             <input
                               type={isShowing ? "text" : "password"}
                               className="settings-input"
@@ -850,20 +855,21 @@ export default function SettingsModal() {
                             <button
                               className="settings-eye-btn"
                               onClick={() => setShowKey({ ...showKey, [provider.id]: !isShowing })}
+                              title={isShowing ? "隐藏" : "显示"}
                             >
                               {isShowing ? <EyeOff size={13} /> : <Eye size={13} />}
                             </button>
                           </div>
 
                           {/* 可自定义编辑的模型 Tag 列表 */}
-                          <div style={{ marginTop: 10 }}>
+                          <div style={{ marginTop: 8 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                               <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>
-                                模型 ID 列表 ({provider.models?.length || 0})：
+                                支持模型 ({provider.models?.length || 0})：
                               </span>
                               <button
                                 className="settings-btn text-xs"
-                                style={{ padding: "1px 6px", fontSize: 10 }}
+                                style={{ padding: "2px 7px", fontSize: 10, borderRadius: 6 }}
                                 onClick={() => setShowAddModel((prev) => ({ ...prev, [provider.id]: !prev[provider.id] }))}
                               >
                                 {showAddModel[provider.id] ? "收起" : "+ 添加模型"}
@@ -878,18 +884,19 @@ export default function SettingsModal() {
                                   style={{
                                     display: "inline-flex",
                                     alignItems: "center",
-                                    gap: 4,
-                                    padding: "2px 7px",
-                                    background: "var(--bg-subtle)",
+                                    gap: 5,
+                                    padding: "3px 8px",
+                                    background: "var(--bg)",
                                     borderRadius: 6,
-                                    fontSize: 11,
-                                    border: "1px solid var(--border-color)"
+                                    fontSize: 11.5,
+                                    border: "1px solid var(--border-soft)",
+                                    color: "var(--text-2)"
                                   }}
                                 >
                                   <span>{m.name || m.id}</span>
                                   <X
                                     size={11}
-                                    style={{ cursor: "pointer", opacity: 0.6 }}
+                                    style={{ cursor: "pointer", opacity: 0.5, transition: "opacity .12s" }}
                                     onClick={() => deleteModelFromProvider(provider.id, m.id)}
                                   />
                                 </span>
@@ -901,8 +908,8 @@ export default function SettingsModal() {
                                 <input
                                   type="text"
                                   className="settings-input text-xs"
-                                  style={{ flex: 1, padding: "4px 8px" }}
-                                  placeholder="输入自定义模型 ID (例: deepseek-chat)"
+                                  style={{ flex: 1, padding: "4px 8px", height: 30 }}
+                                  placeholder="输入模型 ID (例: deepseek-chat)"
                                   value={newModelInputs[provider.id] || ""}
                                   onChange={(e) => setNewModelInputs({ ...newModelInputs, [provider.id]: e.target.value })}
                                   onKeyDown={(e) => {
@@ -914,6 +921,7 @@ export default function SettingsModal() {
                                 />
                                 <button
                                   className="settings-btn text-xs btn-primary"
+                                  style={{ height: 30, padding: "0 10px" }}
                                   onClick={() => {
                                     addModelToProvider(provider.id, newModelInputs[provider.id] || "");
                                     setNewModelInputs({ ...newModelInputs, [provider.id]: "" });
@@ -925,10 +933,10 @@ export default function SettingsModal() {
                             )}
                           </div>
 
-                          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                          <div style={{ display: "flex", gap: 6, marginTop: 10, paddingTop: 6, borderTop: "1px solid var(--border-soft)" }}>
                             <button
                               className="settings-btn btn-primary text-xs"
-                              style={{ flex: 1 }}
+                              style={{ flex: 1, height: 30 }}
                               disabled={!val.trim()}
                               onClick={async () => {
                                 await saveApiKey(provider.id, val);
@@ -939,6 +947,7 @@ export default function SettingsModal() {
                             </button>
                             <button
                               className="settings-btn text-xs"
+                              style={{ height: 30 }}
                               disabled={isTesting}
                               onClick={async () => {
                                 setTestingProvider(provider.id);
@@ -952,6 +961,7 @@ export default function SettingsModal() {
                             {hasKey && (
                               <button
                                 className="settings-btn danger text-xs"
+                                style={{ height: 30 }}
                                 onClick={() => deleteApiKey(provider.id)}
                               >
                                 清除
@@ -960,7 +970,7 @@ export default function SettingsModal() {
                           </div>
 
                           {testRes && (
-                            <div style={{ marginTop: 4, fontSize: 11, color: testRes.ok ? "var(--green)" : "var(--red)" }}>
+                            <div style={{ marginTop: 4, fontSize: 11, color: testRes.ok ? "#10B981" : "#EF4444" }}>
                               {testRes.ok ? `✓ ${testRes.message}` : `✗ ${testRes.error}`}
                             </div>
                           )}
