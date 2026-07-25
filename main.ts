@@ -980,28 +980,56 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const metrics = await getDisplayMetrics();
 
       let accessibilityGranted = false;
-      let screenRecordingGranted = true;
+      let screenRecordingGranted = false;
 
       if (Deno.build.os === "darwin") {
+        // 1. 辅助功能检测 (AXIsProcessTrusted + AppleScript System Events 双重检测)
         try {
           const appServices = Deno.dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", {
             AXIsProcessTrusted: { parameters: [], result: "bool" },
           });
           accessibilityGranted = appServices.symbols.AXIsProcessTrusted();
           appServices.close();
-        } catch {
-          accessibilityGranted = false;
+        } catch {}
+
+        if (!accessibilityGranted) {
+          try {
+            const cmd = new Deno.Command("osascript", {
+              args: ["-e", 'tell application "System Events" to return true'],
+              stdout: "null", stderr: "null"
+            });
+            const r = await cmd.output();
+            accessibilityGranted = r.code === 0;
+          } catch {}
         }
 
+        // 2. 屏幕录制检测 (CGPreflightScreenCaptureAccess + 静默 1x1 截图探针双重检测)
         try {
           const coreGraphics = Deno.dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", {
             CGPreflightScreenCaptureAccess: { parameters: [], result: "bool" },
           });
           screenRecordingGranted = coreGraphics.symbols.CGPreflightScreenCaptureAccess();
           coreGraphics.close();
-        } catch {
-          screenRecordingGranted = true;
+        } catch {}
+
+        if (!screenRecordingGranted) {
+          try {
+            const probePath = `/tmp/screen_probe_${Date.now()}.png`;
+            const cmd = new Deno.Command("screencapture", {
+              args: ["-x", "-R0,0,1,1", probePath],
+              stdout: "null", stderr: "null"
+            });
+            const r = await cmd.output();
+            if (r.code === 0) {
+              const stat = await Deno.stat(probePath);
+              if (stat.size > 0) screenRecordingGranted = true;
+              await Deno.remove(probePath);
+            }
+          } catch {}
         }
+      } else {
+        accessibilityGranted = true;
+        screenRecordingGranted = true;
       }
 
       return json({
