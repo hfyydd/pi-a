@@ -721,11 +721,13 @@ function ModelPicker() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // 从 settings.providers 动态扁平化所有可用的模型项
+  // 从 settings.providers 动态扁平化已填 API Key 或配置启用的真实可用模型项
   const availableModels: Array<{ id: string; provider: string; name: string; providerName: string }> = [];
   if (settings.providers && settings.providers.length > 0) {
     for (const p of settings.providers) {
-      if (p.models && p.models.length > 0) {
+      // 仅当属于 Ollama 本地服务、或者已填写有效 API Key / 显式启用时展示该渠道模型
+      const isConfigured = p.id === "ollama" || (p.apiKey && p.apiKey.trim().length > 0 && p.enabled !== false);
+      if (isConfigured && p.models && p.models.length > 0) {
         for (const m of p.models) {
           availableModels.push({
             id: m.id,
@@ -738,13 +740,12 @@ function ModelPicker() {
     }
   }
 
-  // 兜底列表（防止初始化未返回）
+  // 兜底列表（当尚未填写任何 API Key 时）
   const fallbackList = [
-    { id: "deepseek-v4-flash", provider: "deepseek", name: "DeepSeek V4 Flash", providerName: "DeepSeek" },
-    { id: "glm-4-flash", provider: "zhipu", name: "GLM-4 Flash", providerName: "智谱 AI" },
+    { id: "deepseek-chat", provider: "deepseek", name: "DeepSeek Chat (V3)", providerName: "DeepSeek" },
+    { id: "glm-4-flash", provider: "zhipu", name: "GLM-4 Flash (免费极速)", providerName: "智谱 AI" },
     { id: "moonshot-v1-8k", provider: "moonshot", name: "Kimi 8K", providerName: "Kimi" },
     { id: "gpt-4o", provider: "openai", name: "GPT-4o", providerName: "OpenAI" },
-    { id: "qwen2.5-coder:latest", provider: "ollama", name: "Qwen 2.5 Coder (本地)", providerName: "Ollama" },
   ];
 
   const modelList = availableModels.length > 0 ? availableModels : fallbackList;
@@ -754,7 +755,7 @@ function ModelPicker() {
     || modelList.find((m) => m.id === modelId)
     || modelList[0];
 
-  const displayName = current ? `${current.name}` : "DeepSeek V4 Flash";
+  const displayName = current ? `${current.name}` : "DeepSeek Chat (V3)";
 
   useEffect(() => {
     if (!open) return;

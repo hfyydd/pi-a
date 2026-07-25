@@ -52,7 +52,6 @@ export const PROVIDER_BASE_URLS: Record<string, string> = {
 // 预设 Provider 的默认模型列表
 export const PRESET_MODELS: Record<string, Array<{ id: string; name: string }>> = {
   deepseek: [
-    { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
     { id: "deepseek-chat", name: "DeepSeek Chat (V3)" },
     { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
   ],
@@ -88,9 +87,9 @@ export const PRESET_MODELS: Record<string, Array<{ id: string; name: string }>> 
     { id: "claude-3-opus-latest", name: "Claude 3 Opus" },
   ],
   google: [
-    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
     { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
   ],
   zai: [
     { id: "step-2-16k", name: "Step-2 16K" },

@@ -50,7 +50,8 @@ export default function CommandPalette() {
   const dynamicModelItems: CommandItem[] = [];
   if (settings.providers && settings.providers.length > 0) {
     for (const p of settings.providers) {
-      if (p.models && p.models.length > 0) {
+      const isConfigured = p.id === "ollama" || (p.apiKey && p.apiKey.trim().length > 0 && p.enabled !== false);
+      if (isConfigured && p.models && p.models.length > 0) {
         for (const m of p.models) {
           const isCurrent = modelProvider === p.id && modelId === m.id;
           dynamicModelItems.push({
@@ -74,12 +75,12 @@ export default function CommandPalette() {
     {
       id: "model-deepseek",
       category: "model",
-      title: "DeepSeek V4 Flash",
-      subtitle: "深度求索最新强推理模型，响应极快",
+      title: "DeepSeek Chat (V3)",
+      subtitle: "深度求索旗舰大语言模型",
       icon: "⚡",
       badge: modelProvider === "deepseek" ? "当前模型" : undefined,
       action: () => {
-        setModel("deepseek", "deepseek-v4-flash");
+        setModel("deepseek", "deepseek-chat");
         setShowCommandPalette(false);
       },
     },
