@@ -189,14 +189,16 @@ export default function SettingsModal() {
                   <div className="perm-diag-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-subtle)", borderRadius: 8 }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>屏幕录制权限 (Screen Recording)</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>用于截取当前屏幕提供给视觉 LLM 分析</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-3)" }}>
+                        用于截取屏幕投递给视觉 LLM（请在系统设置「隐私与安全性 → 屏幕与系统音频录制」中勾选当前 App 或 Terminal）
+                      </div>
                     </div>
                     <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
                       <span className={`log-status-badge ${systemPerms?.screenRecordingGranted ? "success" : "error"}`}>
-                        {systemPerms?.screenRecordingGranted ? "已准备就绪" : "待检测 / 未授权"}
+                        {systemPerms?.screenRecordingGranted ? "已准备就绪" : "待授权 (未勾选屏幕录制)"}
                       </span>
                       <button className="settings-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => openSystemSettings("screen")}>
-                        打开授权设置
+                        打开授权页面
                       </button>
                     </div>
                   </div>

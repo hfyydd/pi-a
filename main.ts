@@ -1042,10 +1042,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
     }
     // POST /api/system/permissions/open — 打开 macOS 权限系统偏好设置页面
     if (path === "/api/system/permissions/open" && req.method === "POST") {
-      const body = await req.json().catch(() => ({}));
-      const target = body.target === "screen" ? "Privacy_ScreenCapture" : "Privacy_Accessibility";
       try {
-        const cmd = new Deno.Command("open", { args: [`x-apple.systempreferences:com.apple.preference.security?${target}`] });
+        const cmd = new Deno.Command("open", { args: ["x-apple.systempreferences:com.apple.preference.security"] });
         await cmd.output();
         return json({ ok: true });
       } catch (e) {
