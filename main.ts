@@ -456,7 +456,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
     // GET /api/settings — 获取全局设置
     if (path === "/api/settings" && req.method === "GET") {
       const { getSetting } = await import("./src/domains/settings/node/store.ts");
-      const { listAllProviders, listAvailableProviders } = await import("./src/agent/models.ts");
+      const { listAllProviders, listAvailableProviders, getCustomProviders } = await import("./src/agent/models.ts");
       const defaultProvider = getSetting("default_provider", "deepseek");
       const defaultModelId = getSetting("default_model_id", "deepseek-v4-flash");
       const docsDir = getSetting("docs_dir", "~/Desktop");
@@ -484,6 +484,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const securityCommandRules = getSetting("security_command_rules", JSON.stringify(["git", "deno", "npm", "python"]));
       const securityNetworkRules = getSetting("security_network_rules", JSON.stringify(["api.deepseek.com", "github.com", "deno.land"]));
 
+      const ollamaBaseUrl = getSetting("ollama_base_url", "http://127.0.0.1:11434");
+
       return json({
         defaultProvider,
         defaultModelId,
@@ -508,6 +510,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
         securityFileRules,
         securityCommandRules,
         securityNetworkRules,
+        ollamaBaseUrl,
+        customProviders: getCustomProviders(),
         providers: listAllProviders(),
         availableProviders: listAvailableProviders(),
       });
@@ -516,6 +520,8 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
     if (path === "/api/settings" && req.method === "POST") {
       const b = await req.json();
       const { setSetting } = await import("./src/domains/settings/node/store.ts");
+      const { registerProvider } = await import("./src/agent/models.ts");
+
       if (b.defaultProvider) setSetting("default_provider", b.defaultProvider);
       if (b.defaultModelId) setSetting("default_model_id", b.defaultModelId);
       if (b.docsDir) setSetting("docs_dir", b.docsDir);
@@ -543,7 +549,132 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       if (b.securityCommandRules !== undefined) setSetting("security_command_rules", b.securityCommandRules);
       if (b.securityNetworkRules !== undefined) setSetting("security_network_rules", b.securityNetworkRules);
 
+      if (b.ollamaBaseUrl) {
+        setSetting("ollama_base_url", b.ollamaBaseUrl);
+        await registerProvider("ollama");
+      }
+
       return json({ ok: true });
+    }
+    // GET /api/ollama/models — 获取/刷新 Ollama 本地已安装模型
+    if (path === "/api/ollama/models" && req.method === "GET") {
+      const { getSetting } = await import("./src/domains/settings/node/store.ts");
+      const { registerProvider } = await import("./src/agent/models.ts");
+      const rawOllamaUrl = getSetting("ollama_base_url", "http://127.0.0.1:11434");
+      const rootUrl = rawOllamaUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+      try {
+        const start = Date.now();
+        const res = await fetch(`${rootUrl}/api/tags`, { signal: AbortSignal.timeout(4000) });
+        const latencyMs = Date.now() - start;
+        if (res.ok) {
+          const data = await res.json();
+          const modelsList = (data.models || []).map((m: any) => ({
+            id: m.name || m.model,
+            name: m.name || m.model,
+            size: m.size ? `${(m.size / (1024 * 1024 * 1024)).toFixed(1)}GB` : undefined,
+            modifiedAt: m.modified_at,
+          }));
+          await registerProvider("ollama");
+          return json({ ok: true, running: true, latencyMs, models: modelsList });
+        }
+        return json({ ok: false, running: false, error: `HTTP ${res.status} ${res.statusText}` });
+      } catch (e) {
+        return json({ ok: false, running: false, error: `未连接到 Ollama 服务 (${(e as Error).message})` });
+      }
+    }
+    // POST /api/settings/custom-providers — 保存/添加自定义 OpenAI 提供商
+    if (path === "/api/settings/custom-providers" && req.method === "POST") {
+      const b = await req.json();
+      const { setSetting, getSetting } = await import("./src/domains/settings/node/store.ts");
+      const { registerProvider } = await import("./src/agent/models.ts");
+      const { setApiKey } = await import("./src/infra/keychain.ts");
+
+      const existingRaw = getSetting("custom_providers", "[]");
+      let list: any[] = [];
+      try { list = JSON.parse(existingRaw); } catch {}
+
+      const providerId = b.id || `custom_${Date.now()}`;
+      const name = b.name || "自定义 Provider";
+      const baseUrl = b.baseUrl || "https://api.openai.com/v1";
+      const modelsList = Array.isArray(b.models)
+        ? b.models
+        : (typeof b.models === "string" ? b.models.split(",").map((s: string) => s.trim()).filter(Boolean) : ["default"]);
+
+      const newItem = { id: providerId, name, baseUrl, models: modelsList };
+      const existingIdx = list.findIndex((item) => item.id === providerId);
+      if (existingIdx >= 0) {
+        list[existingIdx] = newItem;
+      } else {
+        list.push(newItem);
+      }
+
+      setSetting("custom_providers", JSON.stringify(list));
+      if (b.apiKey) {
+        await setApiKey(providerId, b.apiKey);
+      }
+      await registerProvider(providerId);
+      return json({ ok: true, provider: newItem });
+    }
+    // DELETE /api/settings/custom-providers/:id — 删除自定义提供商
+    if (path.startsWith("/api/settings/custom-providers/") && req.method === "DELETE") {
+      const id = path.split("/")[4];
+      const { setSetting, getSetting } = await import("./src/domains/settings/node/store.ts");
+      const { deleteApiKey } = await import("./src/infra/keychain.ts");
+      const existingRaw = getSetting("custom_providers", "[]");
+      let list: any[] = [];
+      try { list = JSON.parse(existingRaw); } catch {}
+      list = list.filter((item) => item.id !== id);
+      setSetting("custom_providers", JSON.stringify(list));
+      await deleteApiKey(id);
+      return json({ ok: true });
+    }
+    // POST /api/settings/test-connection — 连通性测试 (支持预设 / Ollama / 自定义)
+    if (path === "/api/settings/test-connection" && req.method === "POST") {
+      const b = await req.json();
+      const { getApiKey } = await import("./src/infra/keychain.ts");
+      const { PROVIDER_BASE_URLS } = await import("./src/agent/models.ts");
+
+      const providerId = b.provider;
+      const key = b.apiKey || (await getApiKey(providerId)) || "";
+      const rawBaseUrl = b.baseUrl || PROVIDER_BASE_URLS[providerId] || "https://api.openai.com/v1";
+
+      const start = Date.now();
+
+      // Ollama 连通测试
+      if (providerId === "ollama") {
+        const rootUrl = rawBaseUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+        try {
+          const res = await fetch(`${rootUrl}/api/tags`, { signal: AbortSignal.timeout(4000) });
+          const latencyMs = Date.now() - start;
+          if (res.ok) {
+            const data = await res.json();
+            const count = data.models?.length || 0;
+            return json({ ok: true, latencyMs, message: `Ollama 连接正常，查找到 ${count} 个本地模型` });
+          }
+          return json({ ok: false, error: `Ollama 响应异常 (HTTP ${res.status})` });
+        } catch (e) {
+          return json({ ok: false, error: `无法连接到 Ollama 服务 (${(e as Error).message})` });
+        }
+      }
+
+      // 其它云端/通用 API 连通测试
+      const baseUrl = rawBaseUrl.endsWith("/v1") ? rawBaseUrl : `${rawBaseUrl.replace(/\/$/, "")}/v1`;
+      try {
+        const res = await fetch(`${baseUrl}/models`, {
+          headers: key ? { Authorization: `Bearer ${key}` } : {},
+          signal: AbortSignal.timeout(6000),
+        });
+        const latencyMs = Date.now() - start;
+        if (res.ok) {
+          return json({ ok: true, latencyMs, message: `连接成功 (延迟 ${latencyMs}ms)` });
+        }
+        if (res.status === 401 || res.status === 403) {
+          return json({ ok: false, error: "身份验证失败 (401/403): 请检查 API Key 是否有效" });
+        }
+        return json({ ok: true, latencyMs, message: `网络通畅 (HTTP ${res.status})` });
+      } catch (e) {
+        return json({ ok: false, error: `网络请求失败: ${(e as Error).message}` });
+      }
     }
     // GET /api/settings/audit-logs — 获取安全中心审计日志
     if (path === "/api/settings/audit-logs" && req.method === "GET") {

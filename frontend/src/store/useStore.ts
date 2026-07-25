@@ -123,6 +123,8 @@ interface AppState {
     securityFileRules: string;
     securityCommandRules: string;
     securityNetworkRules: string;
+    ollamaBaseUrl: string;
+    customProviders: Array<{ id: string; name: string; baseUrl: string; apiKey?: string; models: string[] }>;
     providers: any[];
     availableProviders: any[];
   };
@@ -137,6 +139,10 @@ interface AppState {
   loadMemories: () => Promise<void>;
   deleteMemory: (id: string) => Promise<void>;
   loadAuditLogs: () => Promise<void>;
+  testConnection: (params: { provider: string; apiKey?: string; baseUrl?: string }) => Promise<{ ok: boolean; latencyMs?: number; message?: string; error?: string }>;
+  saveCustomProvider: (data: { id?: string; name: string; baseUrl: string; apiKey?: string; models: string | string[] }) => Promise<void>;
+  deleteCustomProvider: (id: string) => Promise<void>;
+  fetchOllamaModels: () => Promise<{ ok: boolean; running: boolean; models?: any[]; error?: string }>;
 
   // Actions
   toggleSidebar: () => void;
@@ -276,6 +282,8 @@ export const useStore = create<AppState>((set, get) => ({
     securityFileRules: JSON.stringify(["/Users/hanfeng/Desktop/pi-a", "/tmp"]),
     securityCommandRules: JSON.stringify(["git", "deno", "npm", "python"]),
     securityNetworkRules: JSON.stringify(["api.deepseek.com", "github.com", "deno.land"]),
+    ollamaBaseUrl: "http://127.0.0.1:11434",
+    customProviders: [],
     providers: [],
     availableProviders: [],
   },
@@ -330,6 +338,42 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadSettings();
     } catch (e) {
       console.error("[settings] deleteApiKey error:", e);
+    }
+  },
+
+  testConnection: async (params) => {
+    try {
+      return await apiPost("/api/settings/test-connection", params);
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  },
+
+  saveCustomProvider: async (data) => {
+    try {
+      await apiPost("/api/settings/custom-providers", data);
+      await get().loadSettings();
+    } catch (e) {
+      console.error("[settings] saveCustomProvider error:", e);
+    }
+  },
+
+  deleteCustomProvider: async (id) => {
+    try {
+      await apiDelete(`/api/settings/custom-providers/${id}`);
+      await get().loadSettings();
+    } catch (e) {
+      console.error("[settings] deleteCustomProvider error:", e);
+    }
+  },
+
+  fetchOllamaModels: async () => {
+    try {
+      const res = await apiGet("/api/ollama/models");
+      await get().loadSettings();
+      return res;
+    } catch (e) {
+      return { ok: false, running: false, error: (e as Error).message };
     }
   },
 

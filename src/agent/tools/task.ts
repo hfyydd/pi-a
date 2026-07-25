@@ -31,8 +31,11 @@ export const taskTool: AgentTool<typeof taskSchema, { tokens: number }> = {
       let model = models.getModel("deepseek", "deepseek-v4-flash");
       if (!model) {
         // 兜底：跨已注册 provider 拿第一个可用模型
-        for (const { models: ms } of listAllProviders()) {
-          if (ms && ms.length > 0) { model = ms[0]; break; }
+        for (const p of listAllProviders()) {
+          if (p.models && p.models.length > 0) {
+            model = models.getModel(p.provider, p.models[0].id);
+            if (model) break;
+          }
         }
       }
       if (!model) {

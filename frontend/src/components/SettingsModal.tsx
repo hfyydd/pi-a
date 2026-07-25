@@ -59,6 +59,10 @@ export default function SettingsModal() {
     toggleTheme,
     auditLogs,
     loadAuditLogs,
+    testConnection,
+    saveCustomProvider,
+    deleteCustomProvider,
+    fetchOllamaModels,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<TabId>("system");
@@ -66,6 +70,18 @@ export default function SettingsModal() {
   // State for API keys form
   const [keysInput, setKeysInput] = useState<Record<string, string>>({});
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+
+  // State for Model tab testing & custom forms
+  const [testResults, setTestResults] = useState<Record<string, any>>({});
+  const [testingProvider, setTestingProvider] = useState<string | null>(null);
+  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [customForm, setCustomForm] = useState<{ id?: string; name: string; baseUrl: string; apiKey: string; models: string }>({
+    name: "",
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "",
+    models: "",
+  });
+  const [ollamaStatus, setOllamaStatus] = useState<any>(null);
 
   // State for memory searching
   const [memorySearch, setMemorySearch] = useState("");
@@ -150,6 +166,9 @@ export default function SettingsModal() {
       }
       if (activeTab === "computer_use") {
         fetchSystemPerms();
+      }
+      if (activeTab === "model") {
+        fetchOllamaModels().then(setOllamaStatus);
       }
     }
   }, [showSettings, activeTab]);
@@ -649,82 +668,403 @@ export default function SettingsModal() {
       case "model":
         return (
           <div className="settings-tab-content">
-            <h2 className="settings-content-title">模型管理</h2>
+            <div className="settings-header-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <h2 className="settings-content-title" style={{ marginBottom: 4 }}>模型配置中心</h2>
+                <p className="settings-section-desc" style={{ color: "var(--text-2)", margin: 0, fontSize: 13 }}>
+                  配置主流云端 AI 模型、本地 Ollama 引擎及自定义 OpenAI 规范 API。密钥完全保存在本地安全钥匙串中。
+                </p>
+              </div>
+              <button
+                className="settings-btn btn-primary"
+                style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}
+                onClick={() => {
+                  setCustomForm({ name: "", baseUrl: "https://api.openai.com/v1", apiKey: "", models: "" });
+                  setCustomModalOpen(true);
+                }}
+              >
+                <Plus size={14} />
+                添加自定义 API
+              </button>
+            </div>
+
             <div className="settings-section">
-              <div className="settings-item-card">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">默认模型供应商</label>
-                  <p className="settings-item-desc">新建对话时默认选中的大模型渠道。</p>
-                </div>
-                <div className="settings-item-control">
-                  <select
-                    className="settings-select"
-                    value={settings.defaultProvider || "deepseek"}
-                    onChange={(e) => updateSettings({ defaultProvider: e.target.value })}
-                  >
-                    {settings.providers?.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    )) || <option value="deepseek">DeepSeek</option>}
-                  </select>
-                </div>
-              </div>
-
-              <div className="settings-item-card">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">默认模型 ID</label>
-                  <p className="settings-item-desc">新建对话时默认使用的模型版本。</p>
-                </div>
-                <div className="settings-item-control">
-                  <select
-                    className="settings-select"
-                    value={settings.defaultModelId || "deepseek-v4-flash"}
-                    onChange={(e) => updateSettings({ defaultModelId: e.target.value })}
-                  >
-                    {settings.providers
-                      ?.find((p: any) => p.id === (settings.defaultProvider || "deepseek"))
-                      ?.models?.map((m: any) => (
-                        <option key={m.id} value={m.id}>
-                          {m.id}
+              {/* 默认模型配置卡片 */}
+              <div className="security-card-box full-width">
+                <h3 className="security-card-title" style={{ marginBottom: 12 }}>默认模型与默认渠道</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label className="settings-item-title" style={{ fontSize: 12.5, display: "block", marginBottom: 6 }}>
+                      默认模型提供商
+                    </label>
+                    <select
+                      className="settings-select"
+                      style={{ width: "100%" }}
+                      value={settings.defaultProvider || "deepseek"}
+                      onChange={(e) => updateSettings({ defaultProvider: e.target.value })}
+                    >
+                      {settings.providers?.map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name || p.id}
                         </option>
-                      )) || <option value="deepseek-v4-flash">deepseek-v4-flash</option>}
-                  </select>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="settings-item-title" style={{ fontSize: 12.5, display: "block", marginBottom: 6 }}>
+                      默认模型 ID
+                    </label>
+                    <select
+                      className="settings-select"
+                      style={{ width: "100%" }}
+                      value={settings.defaultModelId || "deepseek-v4-flash"}
+                      onChange={(e) => updateSettings({ defaultModelId: e.target.value })}
+                    >
+                      {settings.providers
+                        ?.find((p: any) => p.id === (settings.defaultProvider || "deepseek"))
+                        ?.models?.map((m: any) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name || m.id}
+                          </option>
+                        )) || <option value="deepseek-v4-flash">deepseek-v4-flash</option>}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* 模型提供商与可用模型列表（以网格卡片形式展示，对标“测试这些功能都有没有”） */}
-              <div className="models-providers-section" style={{ marginTop: 20 }}>
-                <h3 className="settings-section-subtitle" style={{ marginBottom: 12, fontSize: 13.5, color: "var(--text-2)" }}>支持的提供商与配置状态</h3>
-                <div className="providers-grid">
-                  {settings.providers?.map((provider: any) => {
-                    const isConfigured = apiKeys[provider.id] === true;
-                    return (
-                      <div key={provider.id} className={`provider-model-card ${isConfigured ? "configured" : "unconfigured"}`}>
-                        <div className="provider-card-header">
-                          <h4 className="provider-name">{provider.name}</h4>
-                          <span className={`provider-status-badge ${isConfigured ? "ok" : "warn"}`}>
-                            {isConfigured ? "已配置" : "未配置"}
-                          </span>
-                        </div>
-                        <p className="provider-desc">内置模型：</p>
-                        <div className="provider-models-tags">
-                          {provider.models?.map((m: any) => (
-                            <span key={m.id} className="model-tag-item">{m.id}</span>
-                          ))}
-                        </div>
-                        <button
-                          className="provider-configure-btn"
-                          onClick={() => setActiveTab("account")}
+              {/* 本地 Ollama 配置卡片 */}
+              <div className="security-card-box full-width" style={{ marginTop: 16 }}>
+                <div className="security-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="security-card-title-group" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>🦙</span>
+                    <h3 className="security-card-title" style={{ margin: 0 }}>Ollama 本地大模型</h3>
+                    <span className={`log-status-badge ${ollamaStatus?.running ? "success" : "error"}`}>
+                      {ollamaStatus?.loading ? "检测中..." : ollamaStatus?.running ? `服务在线 (${ollamaStatus.latencyMs || 0}ms)` : "未连接"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="settings-btn"
+                      onClick={async () => {
+                        const res = await fetchOllamaModels();
+                        setOllamaStatus(res);
+                      }}
+                    >
+                      刷新本地模型
+                    </button>
+                    <button
+                      className="settings-btn"
+                      onClick={async () => {
+                        const res = await testConnection({ provider: "ollama", baseUrl: settings.ollamaBaseUrl });
+                        setTestResults((prev) => ({ ...prev, ollama: res }));
+                      }}
+                    >
+                      测试连通性
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <div className="settings-item-meta" style={{ marginBottom: 6 }}>
+                    <label className="settings-item-title" style={{ fontSize: 12.5 }}>Ollama 服务地址 (Base URL)</label>
+                  </div>
+                  <div className="settings-input-row" style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      className="settings-input"
+                      style={{ flex: 1 }}
+                      value={settings.ollamaBaseUrl || "http://127.0.0.1:11434"}
+                      onChange={(e) => updateSettings({ ollamaBaseUrl: e.target.value })}
+                      placeholder="http://127.0.0.1:11434"
+                    />
+                    <button
+                      className="settings-btn"
+                      onClick={() => updateSettings({ ollamaBaseUrl: "http://127.0.0.1:11434" })}
+                    >
+                      恢复默认
+                    </button>
+                  </div>
+                </div>
+
+                {testResults.ollama && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: testResults.ollama.ok ? "var(--green)" : "var(--red)" }}>
+                    {testResults.ollama.ok ? `✓ ${testResults.ollama.message}` : `✗ ${testResults.ollama.error}`}
+                  </div>
+                )}
+
+                {/* 已查找到的 Ollama 模型列表 */}
+                <div style={{ marginTop: 12 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-2)", fontWeight: 600 }}>
+                    已侦测到的本地模型 ({settings.providers?.find((p: any) => p.id === "ollama")?.models?.length || 0})：
+                  </span>
+                  <div className="provider-models-tags" style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {settings.providers
+                      ?.find((p: any) => p.id === "ollama")
+                      ?.models?.map((m: any) => (
+                        <span
+                          key={m.id}
+                          className="model-tag-item"
+                          title="点击设为当前对话模型"
+                          onClick={() => {
+                            useStore.setState({ modelProvider: "ollama", modelId: m.id });
+                            updateSettings({ defaultProvider: "ollama", defaultModelId: m.id });
+                          }}
+                          style={{ cursor: "pointer" }}
                         >
-                          {isConfigured ? "更新密钥" : "前往配置密钥"}
-                        </button>
-                      </div>
-                    );
-                  })}
+                          🦙 {m.id} {m.size ? `(${m.size})` : ""}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 自定义 OpenAI 提供商卡片列表 */}
+              {settings.customProviders && settings.customProviders.length > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <h3 className="settings-section-subtitle" style={{ marginBottom: 12, fontSize: 13.5, color: "var(--text-2)" }}>
+                    自定义 OpenAI 规范端点 ({settings.customProviders.length})
+                  </h3>
+                  <div className="providers-grid">
+                    {settings.customProviders.map((cp) => {
+                      const isTesting = testingProvider === cp.id;
+                      const testRes = testResults[cp.id];
+                      return (
+                        <div key={cp.id} className="provider-model-card configured">
+                          <div className="provider-card-header">
+                            <div>
+                              <h4 className="provider-name">🔧 {cp.name}</h4>
+                              <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>{cp.baseUrl}</div>
+                            </div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button
+                                className="settings-btn text-xs"
+                                style={{ padding: "3px 7px" }}
+                                onClick={() => {
+                                  setCustomForm({
+                                    id: cp.id,
+                                    name: cp.name,
+                                    baseUrl: cp.baseUrl,
+                                    apiKey: "",
+                                    models: (cp.models || []).join(", "),
+                                  });
+                                  setCustomModalOpen(true);
+                                }}
+                              >
+                                编辑
+                              </button>
+                              <button
+                                className="settings-btn danger text-xs"
+                                style={{ padding: "3px 7px" }}
+                                onClick={() => deleteCustomProvider(cp.id)}
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </div>
+                          <div className="provider-models-tags" style={{ marginTop: 8 }}>
+                            {cp.models?.map((m) => (
+                              <span key={m} className="model-tag-item">{m}</span>
+                            ))}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                            <button
+                              className="settings-btn text-xs"
+                              disabled={isTesting}
+                              onClick={async () => {
+                                setTestingProvider(cp.id);
+                                const res = await testConnection({ provider: cp.id, baseUrl: cp.baseUrl });
+                                setTestResults((prev) => ({ ...prev, [cp.id]: res }));
+                                setTestingProvider(null);
+                              }}
+                            >
+                              {isTesting ? "测试中..." : "测试连通性"}
+                            </button>
+                            {testRes && (
+                              <span style={{ fontSize: 11, color: testRes.ok ? "var(--green)" : "var(--red)" }}>
+                                {testRes.ok ? `✓ ${testRes.latencyMs || 0}ms` : `✗ 失败`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 主流云端大模型服务商 */}
+              <div className="models-providers-section" style={{ marginTop: 20 }}>
+                <h3 className="settings-section-subtitle" style={{ marginBottom: 12, fontSize: 13.5, color: "var(--text-2)" }}>
+                  主流云端模型服务商 API 配置
+                </h3>
+                <div className="providers-grid">
+                  {settings.providers
+                    ?.filter((p: any) => p.id !== "ollama" && !p.isCustom)
+                    .map((provider: any) => {
+                      const hasKey = !!apiKeys[provider.id];
+                      const val = keysInput[provider.id] || "";
+                      const isShowing = !!showKey[provider.id];
+                      const isTesting = testingProvider === provider.id;
+                      const testRes = testResults[provider.id];
+
+                      return (
+                        <div key={provider.id} className={`provider-model-card ${hasKey ? "configured" : "unconfigured"}`}>
+                          <div className="provider-card-header">
+                            <h4 className="provider-name">{provider.name}</h4>
+                            <span className={`provider-status-badge ${hasKey ? "ok" : "warn"}`}>
+                              {hasKey ? "已配置 Key" : "未配置 Key"}
+                            </span>
+                          </div>
+
+                          {/* API Key 密码卡片 */}
+                          <div className="settings-input-password-wrapper" style={{ marginTop: 8 }}>
+                            <input
+                              type={isShowing ? "text" : "password"}
+                              className="settings-input"
+                              placeholder={hasKey ? "••••••••••••••••••••••••" : "输入 API Key"}
+                              value={val}
+                              onChange={(e) => setKeysInput({ ...keysInput, [provider.id]: e.target.value })}
+                            />
+                            <button
+                              className="settings-eye-btn"
+                              onClick={() => setShowKey({ ...showKey, [provider.id]: !isShowing })}
+                            >
+                              {isShowing ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                          </div>
+
+                          <div className="provider-models-tags" style={{ marginTop: 8 }}>
+                            {provider.models?.map((m: any) => (
+                              <span key={m.id} className="model-tag-item">{m.id}</span>
+                            ))}
+                          </div>
+
+                          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                            <button
+                              className="settings-btn btn-primary text-xs"
+                              style={{ flex: 1 }}
+                              disabled={!val.trim()}
+                              onClick={async () => {
+                                await saveApiKey(provider.id, val);
+                                setKeysInput({ ...keysInput, [provider.id]: "" });
+                              }}
+                            >
+                              保存 Key
+                            </button>
+                            <button
+                              className="settings-btn text-xs"
+                              disabled={isTesting}
+                              onClick={async () => {
+                                setTestingProvider(provider.id);
+                                const res = await testConnection({ provider: provider.id, apiKey: val || undefined });
+                                setTestResults((prev) => ({ ...prev, [provider.id]: res }));
+                                setTestingProvider(null);
+                              }}
+                            >
+                              {isTesting ? "测试中..." : "测试连接"}
+                            </button>
+                            {hasKey && (
+                              <button
+                                className="settings-btn danger text-xs"
+                                onClick={() => deleteApiKey(provider.id)}
+                              >
+                                清除
+                              </button>
+                            )}
+                          </div>
+
+                          {testRes && (
+                            <div style={{ marginTop: 4, fontSize: 11, color: testRes.ok ? "var(--green)" : "var(--red)" }}>
+                              {testRes.ok ? `✓ ${testRes.message}` : `✗ ${testRes.error}`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>
+
+            {/* 自定义 Provider 添加/编辑弹窗 */}
+            {customModalOpen && (
+              <div className="cmd-palette-backdrop" style={{ zIndex: 1000 }}>
+                <div className="cmd-palette-modal" style={{ padding: 20, maxWidth: 480 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, color: "var(--text)" }}>
+                      {customForm.id ? "编辑自定义 OpenAI API" : "添加自定义 OpenAI API"}
+                    </h3>
+                    <button className="settings-eye-btn" onClick={() => setCustomModalOpen(false)}>
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div>
+                      <label className="settings-item-title" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                        提供商名称 (Provider Name)
+                      </label>
+                      <input
+                        type="text"
+                        className="settings-input w-full"
+                        placeholder="例如: 硅基流动 / 公司代理"
+                        value={customForm.name}
+                        onChange={(e) => setCustomForm({ ...customForm, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="settings-item-title" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                        Base URL (兼容 OpenAI /v1 端点)
+                      </label>
+                      <input
+                        type="text"
+                        className="settings-input w-full"
+                        placeholder="例如: https://api.siliconflow.cn/v1"
+                        value={customForm.baseUrl}
+                        onChange={(e) => setCustomForm({ ...customForm, baseUrl: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="settings-item-title" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                        API Key (可选)
+                      </label>
+                      <input
+                        type="password"
+                        className="settings-input w-full"
+                        placeholder="sk-..."
+                        value={customForm.apiKey}
+                        onChange={(e) => setCustomForm({ ...customForm, apiKey: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="settings-item-title" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+                        可用模型列表 (英文逗号分隔)
+                      </label>
+                      <input
+                        type="text"
+                        className="settings-input w-full"
+                        placeholder="例如: deepseek-ai/DeepSeek-V3, Qwen/Qwen2.5-Coder-32B-Instruct"
+                        value={customForm.models}
+                        onChange={(e) => setCustomForm({ ...customForm, models: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+                    <button className="settings-btn" onClick={() => setCustomModalOpen(false)}>取消</button>
+                    <button
+                      className="settings-btn btn-primary"
+                      disabled={!customForm.name.trim() || !customForm.baseUrl.trim()}
+                      onClick={async () => {
+                        await saveCustomProvider(customForm);
+                        setCustomModalOpen(false);
+                      }}
+                    >
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 

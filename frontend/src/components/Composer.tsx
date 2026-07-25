@@ -714,27 +714,47 @@ function CheckMark() {
   );
 }
 
-/* ===== 模型选择器（对齐 WorkBuddy 截图2）===== */
-
-const MODEL_LIST = [
-  { id: "Hy3", provider: "zhipu", name: "Hy3", badge: "当前全高", price: "0.00x", recommended: true },
-  { id: "GLM-5.2", provider: "zhipu", name: "GLM-5.2", badge: "周间折扣", price: "0.79x" },
-  { id: "GLM-5.1", provider: "zhipu", name: "GLM-5.1", badge: "", price: "0.79x" },
-  { id: "GLM-5v-Turbo", provider: "zhipu", name: "GLM-5v-Turbo", badge: "", price: "0.95x" },
-  { id: "MiniMax-M3", provider: "minimax", name: "MiniMax-M3", badge: "", price: "0.25x" },
-  { id: "Kimi-K2.7-Code", provider: "moonshot", name: "Kimi-K2.7-Code", badge: "", price: "0.57x" },
-  { id: "Kimi-K2.6", provider: "moonshot", name: "Kimi-K2.6", badge: "", price: "0.52x" },
-  { id: "deepseek-v4-flash", provider: "deepseek", name: "DeepSeek V4 Flash", badge: "", price: "免费" },
-];
+/* ===== 模型选择器（对齐 WorkBuddy / Pi-a 动态模型）===== */
 
 function ModelPicker() {
-  const { modelId } = useStore();
+  const { modelId, modelProvider, settings, setShowSettings } = useStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // 当前选中的模型显示名
-  const current = MODEL_LIST.find(m => m.id === (modelId || "deepseek-v4-flash")) || MODEL_LIST[MODEL_LIST.length - 1];
-  const displayName = current.name;
+  // 从 settings.providers 动态扁平化所有可用的模型项
+  const availableModels: Array<{ id: string; provider: string; name: string; providerName: string }> = [];
+  if (settings.providers && settings.providers.length > 0) {
+    for (const p of settings.providers) {
+      if (p.models && p.models.length > 0) {
+        for (const m of p.models) {
+          availableModels.push({
+            id: m.id,
+            provider: p.id,
+            name: m.name || m.id,
+            providerName: p.name || p.id,
+          });
+        }
+      }
+    }
+  }
+
+  // 兜底列表（防止初始化未返回）
+  const fallbackList = [
+    { id: "deepseek-v4-flash", provider: "deepseek", name: "DeepSeek V4 Flash", providerName: "DeepSeek" },
+    { id: "glm-4-flash", provider: "zhipu", name: "GLM-4 Flash", providerName: "智谱 AI" },
+    { id: "moonshot-v1-8k", provider: "moonshot", name: "Kimi 8K", providerName: "Kimi" },
+    { id: "gpt-4o", provider: "openai", name: "GPT-4o", providerName: "OpenAI" },
+    { id: "qwen2.5-coder:latest", provider: "ollama", name: "Qwen 2.5 Coder (本地)", providerName: "Ollama" },
+  ];
+
+  const modelList = availableModels.length > 0 ? availableModels : fallbackList;
+
+  // 当前选中的模型
+  const current = modelList.find((m) => m.id === modelId && m.provider === modelProvider)
+    || modelList.find((m) => m.id === modelId)
+    || modelList[0];
+
+  const displayName = current ? `${current.name}` : "DeepSeek V4 Flash";
 
   useEffect(() => {
     if (!open) return;
@@ -745,20 +765,28 @@ function ModelPicker() {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const handleSelect = (m: typeof MODEL_LIST[number]) => {
-    // 更新 store 的模型（影响新建会话和后续请求）
+  const handleSelect = (m: (typeof modelList)[number]) => {
     useStore.setState({ modelId: m.id, modelProvider: m.provider });
     setOpen(false);
   };
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen(!open)}
+      <button
+        onClick={() => setOpen(!open)}
         style={{
-          display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 8px",
-          border: "1px solid transparent", borderRadius: 7, background: "transparent",
-          color: "var(--text-2)", fontSize: 12, fontWeight: 500,
-        }}>
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "5px 8px",
+          border: "1px solid transparent",
+          borderRadius: 7,
+          background: "transparent",
+          color: "var(--text-2)",
+          fontSize: 12,
+          fontWeight: 500,
+        }}
+      >
         <Sparkles size={14} />
         <span>{displayName}</span>
         <ChevronDown size={11} style={{ transition: "transform .15s", transform: open ? "rotate(180deg)" : "none" }} />
@@ -769,39 +797,47 @@ function ModelPicker() {
           {/* Max 模式 */}
           <div className="model-picker-header">
             <Zap size={13} className="model-picker-header-icon" />
-            <span className="model-picker-header-title">Max 模式</span>
+            <span className="model-picker-header-title">Max 模式 (全开)</span>
             <label className="model-picker-toggle">
-              <input type="checkbox" />
+              <input type="checkbox" defaultChecked />
               <span className="toggle-slider" />
             </label>
           </div>
 
           {/* 推荐模型 */}
           <div className="model-picker-section-title">
-            <Sparkles size={13} /> 推荐模型
+            <Sparkles size={13} /> 可用大模型列表 ({modelList.length})
           </div>
 
           {/* 模型列表 */}
-          <div className="model-picker-list">
-            {MODEL_LIST.map((m) => (
-              <button
-                key={m.id}
-                className={`model-item ${m.id === (modelId || "deepseek-v4-flash") ? "active" : ""}`}
-                onClick={() => handleSelect(m)}
-              >
-                <span className="model-item-dot" style={{ background: getModelColor(m.provider) }} />
-                <span className="model-item-name">{m.name}</span>
-                {m.badge && <span className={`model-badge ${m.badge.includes("全高") ? "highlight" : ""}`}>{m.badge}</span>}
-                <span className="model-item-price">{m.price}</span>
-                {m.id === (modelId || "deepseek-v4-flash") && <CheckMark />}
-              </button>
-            ))}
+          <div className="model-picker-list" style={{ maxHeight: 240, overflowY: "auto" }}>
+            {modelList.map((m) => {
+              const active = m.id === modelId;
+              return (
+                <button
+                  key={`${m.provider}-${m.id}`}
+                  className={`model-item ${active ? "active" : ""}`}
+                  onClick={() => handleSelect(m)}
+                >
+                  <span className="model-item-dot" style={{ background: getModelColor(m.provider) }} />
+                  <span className="model-item-name">{m.name}</span>
+                  <span className="model-item-price" style={{ fontSize: 10, color: "var(--text-3)" }}>{m.providerName}</span>
+                  {active && <CheckMark />}
+                </button>
+              );
+            })}
           </div>
 
           {/* 配置自定义模型 */}
-          <button className="model-custom-btn">
+          <button
+            className="model-custom-btn"
+            onClick={() => {
+              setOpen(false);
+              setShowSettings(true);
+            }}
+          >
             <Settings2 size={13} />
-            配置自定义模型
+            配置模型与 API 渠道
           </button>
         </div>
       )}

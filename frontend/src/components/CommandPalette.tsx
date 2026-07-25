@@ -17,12 +17,14 @@ export default function CommandPalette() {
     showCommandPalette,
     setShowCommandPalette,
     modelProvider,
+    modelId,
     setModel,
     mode,
     setMode,
     permission,
     setPermission,
     sendMessage,
+    settings,
   } = useStore();
 
   const [query, setQuery] = useState("");
@@ -44,8 +46,31 @@ export default function CommandPalette() {
 
   if (!showCommandPalette) return null;
 
-  const items: CommandItem[] = [
-    // 1. 模型选择
+  // 动态构建模型 Command Items
+  const dynamicModelItems: CommandItem[] = [];
+  if (settings.providers && settings.providers.length > 0) {
+    for (const p of settings.providers) {
+      if (p.models && p.models.length > 0) {
+        for (const m of p.models) {
+          const isCurrent = modelProvider === p.id && modelId === m.id;
+          dynamicModelItems.push({
+            id: `model-${p.id}-${m.id}`,
+            category: "model",
+            title: `${p.name || p.id}: ${m.name || m.id}`,
+            subtitle: `切换大模型渠道为 ${p.name || p.id} (${m.id})`,
+            icon: p.id === "ollama" ? "🦙" : p.id === "deepseek" ? "⚡" : p.id === "zhipu" ? "🧠" : "🤖",
+            badge: isCurrent ? "当前模型" : undefined,
+            action: () => {
+              setModel(p.id, m.id);
+              setShowCommandPalette(false);
+            },
+          });
+        }
+      }
+    }
+  }
+
+  const fallbackModelItems: CommandItem[] = [
     {
       id: "model-deepseek",
       category: "model",
@@ -94,6 +119,13 @@ export default function CommandPalette() {
         setShowCommandPalette(false);
       },
     },
+  ];
+
+  const modelItems = dynamicModelItems.length > 0 ? dynamicModelItems : fallbackModelItems;
+
+  const items: CommandItem[] = [
+    // 1. 模型选择
+    ...modelItems,
     // 2. 运行模式
     {
       id: "mode-craft",
