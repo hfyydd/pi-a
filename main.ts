@@ -466,7 +466,7 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       const autoUpdateSkills = getSetting("auto_update_skills", "true") === "true";
       const autoInstallSkills = getSetting("auto_install_skills", "false") === "true";
       const keepAwake = getSetting("keep_awake", "false") === "true";
-      const defaultWorkspaceDir = getSetting("default_workspace_dir", "~/WorkBuddy");
+      const defaultWorkspaceDir = getSetting("default_workspace_dir", "~/Pi-a");
       const experienceOpt = getSetting("experience_opt", "true") === "true";
 
       const agentSystemPrompt = getSetting("agent_system_prompt", "你是一个有用、高效的本地桌面助理，随时帮我处理各种任务。");

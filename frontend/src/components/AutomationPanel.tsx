@@ -451,7 +451,7 @@ function AutomationDrawer({ prefill, workspaces, onClose, onSaved }: AutomationD
           </Field>
           <label className="auto-push-row">
             <input type="checkbox" checked={pushToWxmp} onChange={(e) => setPushToWxmp(e.target.checked)} />
-            <span>推送到 WorkBuddy 微信小程序</span>
+            <span>推送到 Pi-a 微信小程序</span>
           </label>
         </div>
         <div className="auto-drawer-foot">

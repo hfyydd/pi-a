@@ -366,7 +366,7 @@ export default function SettingsModal() {
                 <div className="settings-item-meta">
                   <label className="settings-item-title">技能自动更新</label>
                   <p className="settings-item-desc">
-                    开启后将自动更新已安装的技能为最新版本，不会更新你在 WorkBuddy 中编辑过的技能。
+                    开启后将自动更新已安装的技能为最新版本，不会更新你在 Pi-a 中编辑过的技能。
                   </p>
                 </div>
                 <div className="settings-item-control">
@@ -433,7 +433,7 @@ export default function SettingsModal() {
                   <input
                     type="text"
                     className="settings-input"
-                    value={settings.defaultWorkspaceDir || "~/WorkBuddy"}
+                    value={settings.defaultWorkspaceDir || "~/Pi-a"}
                     onChange={(e) => updateSettings({ defaultWorkspaceDir: e.target.value })}
                   />
                   <button className="settings-btn" onClick={handleBrowseWorkspaceDir}>

@@ -4,7 +4,7 @@
 
 import { checkToolPermission, resetComputerUseCount } from "./permissions.ts";
 import { getFullTools } from "./tools/index.ts";
-import { createWorkBuddyAgent } from "./engine.ts";
+import { createPiAgent } from "./engine.ts";
 
 let portStr = Deno.env.get("SIDECAR_PORT") || "8899";
 for (let i = 0; i < Deno.args.length; i++) {
@@ -100,7 +100,7 @@ Deno.serve({ port: PORT }, async (req: Request) => {
 
             try {
               const tools = mode === "ask" ? [] : getFullTools();
-              const handle = createWorkBuddyAgent(
+              const handle = createPiAgent(
                 (event: any) => {
                   pushEvent("event", event);
                 },

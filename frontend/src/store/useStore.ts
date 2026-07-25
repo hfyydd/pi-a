@@ -267,7 +267,7 @@ export const useStore = create<AppState>((set, get) => ({
     autoUpdateSkills: true,
     autoInstallSkills: false,
     keepAwake: false,
-    defaultWorkspaceDir: "~/WorkBuddy",
+    defaultWorkspaceDir: "~/Pi-a",
     experienceOpt: true,
     agentSystemPrompt: "你是一个有用、高效的本地桌面助理，随时帮我处理各种任务。",
     agentTemperature: "0.7",

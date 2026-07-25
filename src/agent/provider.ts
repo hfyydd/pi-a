@@ -6,7 +6,7 @@
 import type { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentEvent, AgentTool } from "@earendil-works/pi-agent-core";
 export type { AgentEvent };
-import { createWorkBuddyAgent, type AgentHandle } from "./engine.ts";
+import { createPiAgent, type AgentHandle } from "./engine.ts";
 import { getFullTools, getReadOnlyTools } from "./tools/index.ts";
 import { getDb } from "../infra/db.ts";
 import { updateConversationStatus, getMessages, appendMessage } from "../domains/session/node/store.ts";
@@ -97,7 +97,7 @@ export class LocalPiProvider implements AgentProvider {
         } catch {}
       }
 
-      const handle = createWorkBuddyAgent((event) => {
+      const handle = createPiAgent((event) => {
         // 广播给该会话的所有监听者
         for (const cb of listeners) {
           try {

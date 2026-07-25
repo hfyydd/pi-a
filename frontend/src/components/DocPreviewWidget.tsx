@@ -9,7 +9,7 @@ interface DocPreviewWidgetProps {
 export default function DocPreviewWidget({
   title = "Word 文档预览",
   sections = [
-    { heading: "一、工作概要", body: "本周完成了 WorkBuddy 项目的整体逆向与对标分析，确定了 Deno Desktop 零 IPC 技术路线。" },
+    { heading: "一、工作概要", body: "本周完成了 Pi-a 项目的整体架构演进与全功能构建，确定了基于 Deno Desktop 零 IPC 的全栈轻量路线。" },
     { heading: "二、核心成果", body: "完成了 pi AgentHarness 底座与 29 个工具链的无缝挂载，验证通过端到端链路。" },
   ],
   filePath,

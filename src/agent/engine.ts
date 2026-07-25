@@ -140,7 +140,7 @@ export interface AgentHandle {
  * @param onEvent  事件回调（由 provider 注入，负责推送给前端）
  * @param tools    可选：覆盖默认工具集
  */
-export function createWorkBuddyAgent(
+export function createPiAgent(
   onEvent: (event: AgentEvent) => void,
   opts?: {
     modelProvider?: string;
