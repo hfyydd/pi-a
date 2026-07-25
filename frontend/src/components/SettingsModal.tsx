@@ -1,26 +1,19 @@
 import { useState, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
-  User, Settings, Cpu, Keyboard, Brain, Sparkles, Sliders, Laptop,
-  Shield, HelpCircle, X, Eye, EyeOff, Trash2, Database, Sun, Moon,
+  Settings, Cpu, Brain, Sparkles, Laptop, Shield, HelpCircle, X, Eye, EyeOff, Trash2,
   ChevronRight, Lock, Activity, FileText, Terminal, Globe, Plus
 } from "lucide-react";
 import "./SettingsModal.css";
 import { PiLogo } from "./PiLogo";
 
 type TabId =
-  | "account"
-  | "system"
-  | "computer_use"
-  | "agent"
-  | "shortcut"
-  | "memory"
   | "model"
-  | "assistant"
-  | "personalize"
-  | "data"
+  | "computer_use"
+  | "memory"
+  | "agent"
   | "security"
-  | "help";
+  | "system";
 
 interface TabItem {
   id: TabId;
@@ -29,18 +22,12 @@ interface TabItem {
 }
 
 const TABS: TabItem[] = [
-  { id: "account", label: "账户管理", icon: User },
-  { id: "system", label: "系统设置", icon: Settings },
+  { id: "model", label: "模型与 API 渠道", icon: Sparkles },
   { id: "computer_use", label: "电脑操控 (Computer Use)", icon: Laptop },
+  { id: "memory", label: "长期记忆", icon: Brain },
   { id: "agent", label: "智能体设置", icon: Cpu },
-  { id: "shortcut", label: "快捷键", icon: Keyboard },
-  { id: "memory", label: "记忆", icon: Brain },
-  { id: "model", label: "模型", icon: Sparkles },
-  { id: "assistant", label: "助理设置", icon: Sliders },
-  { id: "personalize", label: "个性化", icon: Laptop },
-  { id: "data", label: "数据管理", icon: Database },
-  { id: "security", label: "安全中心", icon: Shield },
-  { id: "help", label: "帮助与反馈", icon: HelpCircle },
+  { id: "security", label: "安全防护与数据", icon: Shield },
+  { id: "system", label: "常规与快捷键", icon: Settings },
 ];
 
 export default function SettingsModal() {
@@ -55,8 +42,6 @@ export default function SettingsModal() {
     memories,
     loadMemories,
     deleteMemory,
-    theme,
-    toggleTheme,
     auditLogs,
     loadAuditLogs,
     testConnection,
@@ -65,7 +50,7 @@ export default function SettingsModal() {
     fetchOllamaModels,
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState<TabId>("system");
+  const [activeTab, setActiveTab] = useState<TabId>("model");
 
   // State for API keys form
   const [keysInput, setKeysInput] = useState<Record<string, string>>({});
@@ -464,84 +449,50 @@ export default function SettingsModal() {
                   </label>
                 </div>
               </div>
-            </div>
-          </div>
-        );
+              {/* 默认搜索引擎 */}
+              <div className="settings-item-card">
+                <div className="settings-item-meta">
+                  <label className="settings-item-title">默认搜索引擎</label>
+                  <p className="settings-item-desc">智能体在需要联网检索信息时默认选用的搜索引擎。</p>
+                </div>
+                <div className="settings-item-control">
+                  <select
+                    className="settings-select"
+                    value={settings.searchEngine || "google"}
+                    onChange={(e) => updateSettings({ searchEngine: e.target.value })}
+                  >
+                    <option value="google">Google Search</option>
+                    <option value="bing">Bing Search</option>
+                    <option value="duckduckgo">DuckDuckGo</option>
+                  </select>
+                </div>
+              </div>
 
-      case "account":
-        const providersList = [
-          { id: "deepseek", name: "DeepSeek", url: "https://platform.deepseek.com/" },
-          { id: "openai", name: "OpenAI", url: "https://platform.openai.com/" },
-          { id: "anthropic", name: "Anthropic Claude", url: "https://console.anthropic.com/" },
-          { id: "gemini", name: "Google Gemini", url: "https://aistudio.google.com/" },
-          { id: "zhipu", name: "智谱 AI (GLM)", url: "https://open.bigmodel.cn/" },
-        ];
-        return (
-          <div className="settings-tab-content">
-            <h2 className="settings-content-title">账户管理 / API Keys</h2>
-            <div className="settings-section">
-              <p className="settings-intro-text">
-                在这里配置不同大模型提供商的 API Key。密钥会被安全地保存在本地系统钥匙串中，不会上传到云端。
-              </p>
-              {providersList.map((prov) => {
-                const hasKey = !!apiKeys[prov.id];
-                const value = keysInput[prov.id] || "";
-                const isShowing = !!showKey[prov.id];
-                return (
-                  <div key={prov.id} className="settings-item-card col-layout">
-                    <div className="settings-provider-header">
-                      <div>
-                        <span className="settings-provider-name">{prov.name}</span>
-                        <span className={`settings-badge ${hasKey ? "active" : ""}`}>
-                          {hasKey ? "已配置" : "未配置"}
-                        </span>
+              {/* 快捷键列表 */}
+              <div className="security-card-box full-width" style={{ marginTop: 16 }}>
+                <h3 className="security-card-title" style={{ marginBottom: 8 }}>⌨️ 快捷键说明列表</h3>
+                <div className="shortcuts-list" style={{ marginTop: 8 }}>
+                  {[
+                    { keys: ["Option", "Space"], desc: "全局唤醒 / 隐藏 Pi-a 桌面窗口" },
+                    { keys: ["Cmd", "Enter"], desc: "发送当前输入的指令" },
+                    { keys: ["Shift", "Enter"], desc: "在输入框中插入新行" },
+                    { keys: ["Cmd", "N"], desc: "快速创建一个新的对话任务" },
+                    { keys: ["Cmd", "K"], desc: "呼出全局命令快捷面板" },
+                    { keys: ["Esc"], desc: "关闭当前弹窗或中断会话生成" },
+                  ].map((sh, idx) => (
+                    <div key={idx} className="shortcut-row" style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--border-color)" }}>
+                      <span className="shortcut-desc" style={{ fontSize: 13, color: "var(--text)" }}>{sh.desc}</span>
+                      <div className="shortcut-keys" style={{ display: "flex", gap: 4 }}>
+                        {sh.keys.map((k, kIdx) => (
+                          <kbd key={kIdx} className="kbd-key" style={{ padding: "2px 6px", borderRadius: 4, background: "var(--bg-3)", fontSize: 11, border: "1px solid var(--border-color)" }}>
+                            {k}
+                          </kbd>
+                        ))}
                       </div>
-                      <a href={prov.url} target="_blank" rel="noreferrer" className="settings-link text-xs">
-                        获取 API Key
-                      </a>
                     </div>
-                    <div className="settings-input-row" style={{ marginTop: 8 }}>
-                      <div className="settings-input-password-wrapper">
-                        <input
-                          type={isShowing ? "text" : "password"}
-                          className="settings-input"
-                          placeholder={hasKey ? "••••••••••••••••••••••••••••••••" : "输入 API Key"}
-                          value={value}
-                          onChange={(e) => setKeysInput({ ...keysInput, [prov.id]: e.target.value })}
-                        />
-                        <button
-                          className="settings-eye-btn"
-                          onClick={() => setShowKey({ ...showKey, [prov.id]: !isShowing })}
-                        >
-                          {isShowing ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                      <button
-                        className="settings-btn btn-primary"
-                        disabled={!value.trim()}
-                        onClick={async () => {
-                          await saveApiKey(prov.id, value);
-                          setKeysInput({ ...keysInput, [prov.id]: "" });
-                        }}
-                      >
-                        保存
-                      </button>
-                      {hasKey && (
-                        <button
-                          className="settings-btn danger"
-                          onClick={async () => {
-                            if (confirm(`确认要删除 ${prov.name} 的 API Key 吗？`)) {
-                              await deleteApiKey(prov.id);
-                            }
-                          }}
-                        >
-                          清除
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -1050,173 +1001,7 @@ export default function SettingsModal() {
           </div>
         );
 
-      case "assistant":
-        return (
-          <div className="settings-tab-content">
-            <h2 className="settings-content-title">助理设置</h2>
-            <div className="settings-section">
-              {/* 默认搜索引擎 */}
-              <div className="settings-item-card">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">默认搜索引擎</label>
-                  <p className="settings-item-desc">智能体在需要联网检索信息时默认选用的搜索引擎。</p>
-                </div>
-                <div className="settings-item-control">
-                  <select
-                    className="settings-select"
-                    value={settings.searchEngine || "google"}
-                    onChange={(e) => updateSettings({ searchEngine: e.target.value })}
-                  >
-                    <option value="google">Google Search</option>
-                    <option value="bing">Bing Search</option>
-                    <option value="duckduckgo">DuckDuckGo</option>
-                  </select>
-                </div>
-              </div>
 
-              {/* 默认文档检索目录 */}
-              <div className="settings-item-card col-layout">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">默认文档检索路径 (docs_dir)</label>
-                  <p className="settings-item-desc">智能体搜索与加载外部引用文件（如 docx/pdf）的默认起始路径。</p>
-                </div>
-                <div className="settings-input-row" style={{ marginTop: 8 }}>
-                  <input
-                    type="text"
-                    className="settings-input"
-                    value={settings.docsDir || "~/Desktop"}
-                    onChange={(e) => updateSettings({ docsDir: e.target.value })}
-                  />
-                  <button
-                    className="settings-btn"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/pick-dir");
-                        const data = await res.json();
-                        if (!data.cancelled && data.path) {
-                          updateSettings({ docsDir: data.path });
-                        }
-                      } catch {}
-                    }}
-                  >
-                    浏览
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case "shortcut":
-        const shortcuts = [
-          { keys: ["Option", "Space"], desc: "全局唤醒 / 隐藏 Pi-a 助理" },
-          { keys: ["Cmd", "Enter"], desc: "发送当前输入的指令" },
-          { keys: ["Shift", "Enter"], desc: "在输入框中插入新行" },
-          { keys: ["Cmd", "N"], desc: "快速创建一个新的对话任务" },
-          { keys: ["Cmd", "K"], desc: "清除对话并重置侧边栏" },
-          { keys: ["Esc"], desc: "关闭当前弹窗或中断会话生成" },
-        ];
-        return (
-          <div className="settings-tab-content">
-            <h2 className="settings-content-title">快捷键列表</h2>
-            <div className="settings-section">
-              <p className="settings-intro-text">
-                使用快捷键可以在操作 Pi-a 界面时提高效率。
-              </p>
-              <div className="shortcuts-list">
-                {shortcuts.map((sh, idx) => (
-                  <div key={idx} className="shortcut-row">
-                    <span className="shortcut-desc">{sh.desc}</span>
-                    <div className="shortcut-keys">
-                      {sh.keys.map((k, kIdx) => (
-                        <kbd key={kIdx} className="kbd-key">
-                          {k}
-                        </kbd>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
-      case "personalize":
-        return (
-          <div className="settings-tab-content">
-            <h2 className="settings-content-title">个性化</h2>
-            <div className="settings-section">
-              <div className="settings-item-card">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">色彩主题模式</label>
-                  <p className="settings-item-desc">切换软件的浅色、深色模式外观风格。</p>
-                </div>
-                <div className="settings-item-control theme-selector-grid">
-                  <button
-                    className={`theme-card ${theme === "light" ? "active" : ""}`}
-                    onClick={() => {
-                      if (theme !== "light") toggleTheme();
-                    }}
-                  >
-                    <Sun size={20} />
-                    <span>浅色模式</span>
-                  </button>
-                  <button
-                    className={`theme-card ${theme === "dark" ? "active" : ""}`}
-                    onClick={() => {
-                      if (theme !== "dark") toggleTheme();
-                    }}
-                  >
-                    <Moon size={20} />
-                    <span>深色模式</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case "data":
-        return (
-          <div className="settings-tab-content">
-            <h2 className="settings-content-title">数据管理</h2>
-            <div className="settings-section">
-              <div className="settings-item-card col-layout">
-                <div className="settings-item-meta">
-                  <label className="settings-item-title">备份与重置</label>
-                  <p className="settings-item-desc">
-                    在此管理您的本地数据安全，可以清除或导出您的所有任务。
-                  </p>
-                </div>
-                <div className="settings-btn-grid" style={{ marginTop: 12 }}>
-                  <button
-                    className="settings-btn"
-                    onClick={() => {
-                      alert("系统已自动开启动态备份，在 ~/.pi-a/pi-a.db 即可找到数据文件。");
-                    }}
-                  >
-                    浏览本地数据库目录
-                  </button>
-                  <button
-                    className="settings-btn danger"
-                    onClick={() => {
-                      if (
-                        confirm(
-                          "警告！这会清除您在 Pi-a 中的所有对话任务、配置与记忆，且不可撤销！确认清除吗？"
-                        )
-                      ) {
-                        alert("数据已重置。程序将自动重启。");
-                        window.location.reload();
-                      }
-                    }}
-                  >
-                    清除所有对话与配置数据
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
 
       case "security":
         return (
@@ -1462,7 +1247,6 @@ export default function SettingsModal() {
           </div>
         );
 
-      case "help":
       default:
         return (
           <div className="settings-tab-content">
