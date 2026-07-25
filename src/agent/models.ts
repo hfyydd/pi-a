@@ -49,68 +49,19 @@ export const PROVIDER_BASE_URLS: Record<string, string> = {
   ollama: "http://127.0.0.1:11434/v1",
 };
 
-// 预设 Provider 的默认模型列表
+// 预设 Provider 的默认模型列表（清空预设，由用户自由输入指定）
 export const PRESET_MODELS: Record<string, Array<{ id: string; name: string }>> = {
-  deepseek: [
-    { id: "deepseek-chat", name: "DeepSeek Chat (V3)" },
-    { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)" },
-  ],
-  zhipu: [
-    { id: "glm-4-flash", name: "GLM-4 Flash (免费极速)" },
-    { id: "glm-4-plus", name: "GLM-4 Plus (旗舰)" },
-    { id: "glm-4-air", name: "GLM-4 Air (平衡)" },
-    { id: "glm-4-long", name: "GLM-4 Long (超长上下文)" },
-    { id: "glm-4", name: "GLM-4 Standard" },
-  ],
-  moonshot: [
-    { id: "moonshot-v1-8k", name: "Moonshot v1 8K" },
-    { id: "moonshot-v1-32k", name: "Moonshot v1 32K" },
-    { id: "moonshot-v1-128k", name: "Moonshot v1 128K" },
-    { id: "kimi-latest", name: "Kimi Latest" },
-  ],
-  minimax: [
-    { id: "abab6.5s-chat", name: "MiniMax abab6.5s" },
-    { id: "abab6.5t-chat", name: "MiniMax abab6.5t" },
-    { id: "abab6.5g-chat", name: "MiniMax abab6.5g" },
-    { id: "minimax-text-01", name: "MiniMax Text 01" },
-  ],
-  openai: [
-    { id: "gpt-4o", name: "GPT-4o" },
-    { id: "gpt-4o-mini", name: "GPT-4o Mini" },
-    { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
-    { id: "o1", name: "OpenAI o1" },
-    { id: "o3-mini", name: "OpenAI o3-mini" },
-  ],
-  anthropic: [
-    { id: "claude-3-5-sonnet-latest", name: "Claude 3.5 Sonnet" },
-    { id: "claude-3-5-haiku-latest", name: "Claude 3.5 Haiku" },
-    { id: "claude-3-opus-latest", name: "Claude 3 Opus" },
-  ],
-  google: [
-    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
-    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
-    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
-  ],
-  zai: [
-    { id: "step-2-16k", name: "Step-2 16K" },
-    { id: "step-1-flash", name: "Step-1 Flash" },
-  ],
-  zeroone: [
-    { id: "yi-lightning", name: "Yi Lightning" },
-    { id: "yi-large", name: "Yi Large" },
-    { id: "yi-medium", name: "Yi Medium" },
-  ],
-  qwen: [
-    { id: "qwen-max", name: "通义千问 Qwen Max" },
-    { id: "qwen-plus", name: "通义千问 Qwen Plus" },
-    { id: "qwen-turbo", name: "通义千问 Qwen Turbo" },
-    { id: "qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B" },
-  ],
-  ollama: [
-    { id: "qwen2.5-coder:latest", name: "Qwen 2.5 Coder (本地)" },
-    { id: "deepseek-r1:8b", name: "DeepSeek R1 (本地)" },
-    { id: "llama3:latest", name: "Llama 3 (本地)" },
-  ],
+  deepseek: [],
+  zhipu: [],
+  moonshot: [],
+  minimax: [],
+  openai: [],
+  anthropic: [],
+  google: [],
+  zai: [],
+  zeroone: [],
+  qwen: [],
+  ollama: [],
 };
 
 // 已注册的 providers 集合

@@ -65,7 +65,6 @@ export default function SettingsModal() {
 
   // 自定义添加与删除 Provider 下的模型 ID
   const [newModelInputs, setNewModelInputs] = useState<Record<string, string>>({});
-  const [showAddModel, setShowAddModel] = useState<Record<string, boolean>>({});
 
   const addModelToProvider = (providerId: string, rawModelId: string) => {
     const modelId = rawModelId.trim();
@@ -861,76 +860,74 @@ export default function SettingsModal() {
                             </button>
                           </div>
 
-                          {/* 可自定义编辑的模型 Tag 列表 */}
-                          <div style={{ marginTop: 8 }}>
+                          {/* 自定义模型 ID 编辑区 */}
+                          <div style={{ marginTop: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                               <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>
-                                支持模型 ({provider.models?.length || 0})：
+                                自定义模型 ID ({provider.models?.length || 0})：
                               </span>
-                              <button
-                                className="settings-btn text-xs"
-                                style={{ padding: "2px 7px", fontSize: 10, borderRadius: 6 }}
-                                onClick={() => setShowAddModel((prev) => ({ ...prev, [provider.id]: !prev[provider.id] }))}
-                              >
-                                {showAddModel[provider.id] ? "收起" : "+ 添加模型"}
-                              </button>
                             </div>
 
-                            <div className="provider-models-tags" style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                              {provider.models?.map((m: any) => (
-                                <span
-                                  key={m.id}
-                                  className="model-tag-item"
-                                  style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: 5,
-                                    padding: "3px 8px",
-                                    background: "var(--bg)",
-                                    borderRadius: 6,
-                                    fontSize: 11.5,
-                                    border: "1px solid var(--border-soft)",
-                                    color: "var(--text-2)"
-                                  }}
-                                >
-                                  <span>{m.name || m.id}</span>
-                                  <X
-                                    size={11}
-                                    style={{ cursor: "pointer", opacity: 0.5, transition: "opacity .12s" }}
-                                    onClick={() => deleteModelFromProvider(provider.id, m.id)}
-                                  />
+                            <div className="provider-models-tags" style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                              {provider.models && provider.models.length > 0 ? (
+                                provider.models.map((m: any) => (
+                                  <span
+                                    key={m.id}
+                                    className="model-tag-item"
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 5,
+                                      padding: "3px 8px",
+                                      background: "var(--bg)",
+                                      borderRadius: 6,
+                                      fontSize: 11.5,
+                                      border: "1px solid var(--border-soft)",
+                                      color: "var(--text-2)"
+                                    }}
+                                  >
+                                    <span>{m.name || m.id}</span>
+                                    <X
+                                      size={11}
+                                      style={{ cursor: "pointer", opacity: 0.5, transition: "opacity .12s" }}
+                                      onClick={() => deleteModelFromProvider(provider.id, m.id)}
+                                    />
+                                  </span>
+                                ))
+                              ) : (
+                                <span style={{ fontSize: 11.5, color: "var(--text-3)", fontStyle: "italic", padding: "2px 0" }}>
+                                  暂无模型，请在下方手动输入添加
                                 </span>
-                              ))}
+                              )}
                             </div>
 
-                            {showAddModel[provider.id] && (
-                              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                                <input
-                                  type="text"
-                                  className="settings-input text-xs"
-                                  style={{ flex: 1, padding: "4px 8px", height: 30 }}
-                                  placeholder="输入模型 ID (例: deepseek-chat)"
-                                  value={newModelInputs[provider.id] || ""}
-                                  onChange={(e) => setNewModelInputs({ ...newModelInputs, [provider.id]: e.target.value })}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      addModelToProvider(provider.id, newModelInputs[provider.id] || "");
-                                      setNewModelInputs({ ...newModelInputs, [provider.id]: "" });
-                                    }
-                                  }}
-                                />
-                                <button
-                                  className="settings-btn text-xs btn-primary"
-                                  style={{ height: 30, padding: "0 10px" }}
-                                  onClick={() => {
+                            {/* 始终展示的输入框 */}
+                            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                              <input
+                                type="text"
+                                className="settings-input text-xs"
+                                style={{ flex: 1, padding: "4px 8px", height: 30 }}
+                                placeholder={`输入 ${provider.name} 模型 ID (如: ${provider.id === 'deepseek' ? 'deepseek-chat' : provider.id === 'openai' ? 'gpt-4o' : provider.id === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'model-id'})`}
+                                value={newModelInputs[provider.id] || ""}
+                                onChange={(e) => setNewModelInputs({ ...newModelInputs, [provider.id]: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
                                     addModelToProvider(provider.id, newModelInputs[provider.id] || "");
                                     setNewModelInputs({ ...newModelInputs, [provider.id]: "" });
-                                  }}
-                                >
-                                  添加
-                                </button>
-                              </div>
-                            )}
+                                  }
+                                }}
+                              />
+                              <button
+                                className="settings-btn text-xs btn-primary"
+                                style={{ height: 30, padding: "0 10px", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                onClick={() => {
+                                  addModelToProvider(provider.id, newModelInputs[provider.id] || "");
+                                  setNewModelInputs({ ...newModelInputs, [provider.id]: "" });
+                                }}
+                              >
+                                <Plus size={12} /> 添加
+                              </button>
+                            </div>
                           </div>
 
                           <div style={{ display: "flex", gap: 6, marginTop: 10, paddingTop: 6, borderTop: "1px solid var(--border-soft)" }}>

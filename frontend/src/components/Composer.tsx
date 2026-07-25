@@ -717,17 +717,17 @@ function CheckMark() {
 /* ===== 模型选择器（对齐 WorkBuddy / Pi-a 动态模型）===== */
 
 function ModelPicker() {
-  const { modelId, modelProvider, settings, setShowSettings } = useStore();
+  const { modelId, modelProvider, settings, apiKeys, setShowSettings } = useStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // 从 settings.providers 动态扁平化已填 API Key 或配置启用的真实可用模型项
+  // 从 settings.providers 动态扁平化已填 API Key 或配置有模型的真实可用模型项
   const availableModels: Array<{ id: string; provider: string; name: string; providerName: string }> = [];
   if (settings.providers && settings.providers.length > 0) {
     for (const p of settings.providers) {
-      // 仅当属于 Ollama 本地服务、或者已填写有效 API Key / 显式启用时展示该渠道模型
-      const isConfigured = p.id === "ollama" || (p.apiKey && p.apiKey.trim().length > 0 && p.enabled !== false);
-      if (isConfigured && p.models && p.models.length > 0) {
+      // 只要具备 Key、属于 Ollama 本地服务，或者用户在该渠道下添加了模型 ID，则一律输出到可用模型列表
+      const hasKeyOrModels = (p.id === "ollama") || !!apiKeys[p.id] || (p.apiKey && p.apiKey.trim().length > 0) || (p.models && p.models.length > 0);
+      if (hasKeyOrModels && p.models && p.models.length > 0) {
         for (const m of p.models) {
           availableModels.push({
             id: m.id,

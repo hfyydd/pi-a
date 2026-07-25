@@ -25,6 +25,7 @@ export default function CommandPalette() {
     setPermission,
     sendMessage,
     settings,
+    apiKeys,
   } = useStore();
 
   const [query, setQuery] = useState("");
@@ -50,8 +51,8 @@ export default function CommandPalette() {
   const dynamicModelItems: CommandItem[] = [];
   if (settings.providers && settings.providers.length > 0) {
     for (const p of settings.providers) {
-      const isConfigured = p.id === "ollama" || (p.apiKey && p.apiKey.trim().length > 0 && p.enabled !== false);
-      if (isConfigured && p.models && p.models.length > 0) {
+      const hasKeyOrModels = (p.id === "ollama") || !!apiKeys[p.id] || (p.apiKey && p.apiKey.trim().length > 0) || (p.models && p.models.length > 0);
+      if (hasKeyOrModels && p.models && p.models.length > 0) {
         for (const m of p.models) {
           const isCurrent = modelProvider === p.id && modelId === m.id;
           dynamicModelItems.push({
