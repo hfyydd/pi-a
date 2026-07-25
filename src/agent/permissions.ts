@@ -7,6 +7,7 @@
 //   L3 (full)     → 完全控制模式：自动放行常规写操作，但高危操控工具与黑名单危险命令强行弹窗二次确认
 
 import { logToolAudit } from "../infra/db.ts";
+import { PiSandbox } from "./sandbox.ts";
 
 export type PermLevel = "L1" | "L2" | "L3" | "readonly" | "default" | "full";
 
@@ -218,15 +219,11 @@ export async function checkToolPermission(
 ): Promise<PermissionDecision> {
   const level = normalizePermLevel(permInput);
 
-  // ── bash 极危命令黑名单检测（仅拦截系统级毁灭性命令如 rm -rf /） ──
-  if (toolName === "bash") {
-    const cmdStr = (args as any)?.command || "";
-    if (isDangerousCommand(cmdStr)) {
-      console.warn(`[permissions] 拦截到黑名单危险命令: ${cmdStr}`);
-      return { allow: false, block: true, reason: "⚠️ 检测到危险系统级命令（如 rm -rf /），已被拦截。" };
-    }
-    // 对标 pi agent：常规 Shell 指令与脚本 100% 自动执行
-    return { allow: true };
+  // ── Pi-Sandbox 核心防线拦截 ──
+  const sbResult = PiSandbox.getInstance().inspectToolCall(toolName, args);
+  if (!sbResult.allowed) {
+    console.warn(`[Pi-Sandbox] 成功拦截非安全操作: ${sbResult.reason}`);
+    return { allow: false, block: true, reason: sbResult.reason };
   }
 
   // ── L1 显式只读模式 ──
