@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useStore } from "../store/useStore";
 import {
-  Settings, Cpu, Brain, Sparkles, Laptop, Shield, HelpCircle, X, Eye, EyeOff, Trash2,
-  ChevronRight, Lock, Activity, FileText, Terminal, Globe, Plus
+  Settings, Cpu, Brain, Sparkles, Laptop, X, Eye, EyeOff, Trash2, Plus
 } from "lucide-react";
 import "./SettingsModal.css";
 import { PiLogo } from "./PiLogo";
@@ -12,7 +11,6 @@ type TabId =
   | "computer_use"
   | "memory"
   | "agent"
-  | "security"
   | "system";
 
 interface TabItem {
@@ -26,7 +24,6 @@ const TABS: TabItem[] = [
   { id: "computer_use", label: "电脑操控 (Computer Use)", icon: Laptop },
   { id: "memory", label: "长期记忆", icon: Brain },
   { id: "agent", label: "智能体设置", icon: Cpu },
-  { id: "security", label: "安全防护与数据", icon: Shield },
   { id: "system", label: "常规与快捷键", icon: Settings },
 ];
 
@@ -42,8 +39,6 @@ export default function SettingsModal() {
     memories,
     loadMemories,
     deleteMemory,
-    auditLogs,
-    loadAuditLogs,
     testConnection,
     saveCustomProvider,
     deleteCustomProvider,
@@ -70,45 +65,6 @@ export default function SettingsModal() {
 
   // State for memory searching
   const [memorySearch, setMemorySearch] = useState("");
-
-  // Sub-modals for Security center rules
-  const [subModalType, setSubModalType] = useState<"file" | "command" | "network" | null>(null);
-  const [newRuleInput, setNewRuleInput] = useState("");
-
-  const getSecurityRulesList = (type: "file" | "command" | "network"): string[] => {
-    try {
-      const val = type === "file" ? settings.securityFileRules
-                : type === "command" ? settings.securityCommandRules
-                : settings.securityNetworkRules;
-      return JSON.parse(val || "[]");
-    } catch {
-      return [];
-    }
-  };
-
-  const handleAddSecurityRule = (type: "file" | "command" | "network") => {
-    if (!newRuleInput.trim()) return;
-    const current = getSecurityRulesList(type);
-    if (current.includes(newRuleInput.trim())) {
-      setNewRuleInput("");
-      return;
-    }
-    const next = [...current, newRuleInput.trim()];
-    const str = JSON.stringify(next);
-    if (type === "file") updateSettings({ securityFileRules: str });
-    else if (type === "command") updateSettings({ securityCommandRules: str });
-    else updateSettings({ securityNetworkRules: str });
-    setNewRuleInput("");
-  };
-
-  const handleRemoveSecurityRule = (type: "file" | "command" | "network", rule: string) => {
-    const current = getSecurityRulesList(type);
-    const next = current.filter(r => r !== rule);
-    const str = JSON.stringify(next);
-    if (type === "file") updateSettings({ securityFileRules: str });
-    else if (type === "command") updateSettings({ securityCommandRules: str });
-    else updateSettings({ securityNetworkRules: str });
-  };
 
   // State for Computer Use system permissions
   const [systemPerms, setSystemPerms] = useState<any>(null);
@@ -145,9 +101,6 @@ export default function SettingsModal() {
       useStore.getState().loadSettings();
       if (activeTab === "memory") {
         loadMemories();
-      }
-      if (activeTab === "security") {
-        loadAuditLogs();
       }
       if (activeTab === "computer_use") {
         fetchSystemPerms();
@@ -1003,249 +956,7 @@ export default function SettingsModal() {
 
 
 
-      case "security":
-        return (
-          <div className="settings-tab-content security-tab-view">
-            <div className="security-header-row">
-              <div>
-                <h2 className="settings-content-title">安全中心</h2>
-                <p className="security-subtitle">统一管理工作空间内的进程安全、数据安全与系统授权</p>
-              </div>
-              <span className="security-runtime-provider-badge">安全能力由本地运行时提供</span>
-            </div>
 
-            <div className="security-grid-container">
-              {/* 沙箱安全 */}
-              <div className="security-card-box">
-                <div className="security-card-header">
-                  <div className="security-card-title-group">
-                    <Shield size={18} className="icon-green" />
-                    <h3 className="security-card-title">沙箱安全</h3>
-                    <button className="security-help-info" title="沙箱安全说明" onClick={() => alert("沙箱安全通过本地隔离容器运行AI命令与网络访问，防止主机被恶意控制。")}>
-                      <HelpCircle size={14} />
-                    </button>
-                  </div>
-                  <label className="switch-toggle">
-                    <input
-                      type="checkbox"
-                      checked={settings.sandboxSecurity !== false}
-                      onChange={(e) => updateSettings({ sandboxSecurity: e.target.checked })}
-                    />
-                    <span className="slider-round"></span>
-                  </label>
-                </div>
-                <p className="security-card-desc">AI 运行于隔离沙箱，并配置文件、命令、网络访问策略</p>
-
-                <div className="security-list-items">
-                  <div className="security-list-row" onClick={() => setSubModalType("file")}>
-                    <div className="security-row-left">
-                      <FileText size={16} className="item-icon" />
-                      <div>
-                        <div className="security-row-title">文件安全</div>
-                        <div className="security-row-desc">为沙箱拦截后的文件路径配置白名单和黑名单</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="chevron-icon" />
-                  </div>
-
-                  <div className="security-list-row" onClick={() => setSubModalType("command")}>
-                    <div className="security-row-left">
-                      <Terminal size={16} className="item-icon" />
-                      <div>
-                        <div className="security-row-title">命令安全</div>
-                        <div className="security-row-desc">为命令前缀配置询问和放行名单</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="chevron-icon" />
-                  </div>
-
-                  <div className="security-list-row" onClick={() => setSubModalType("network")}>
-                    <div className="security-row-left">
-                      <Globe size={16} className="item-icon" />
-                      <div>
-                        <div className="security-row-title">网络安全</div>
-                        <div className="security-row-desc">控制 URL 访问与沙箱网络域名规则</div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="chevron-icon" />
-                  </div>
-                </div>
-              </div>
-
-              {/* 数据安全 */}
-              <div className="security-card-box">
-                <div className="security-card-header no-toggle">
-                  <div className="security-card-title-group">
-                    <Lock size={18} className="icon-blue" />
-                    <h3 className="security-card-title">数据安全</h3>
-                  </div>
-                </div>
-                <p className="security-card-desc">数据流转及删除行为的安全防护</p>
-
-                <div className="security-data-settings">
-                  {/* 安全网关 */}
-                  <div className="security-data-item">
-                    <div>
-                      <div className="security-data-title">安全网关</div>
-                      <div className="security-data-desc">工作空间出入流量统一经过安全网关安全处理</div>
-                    </div>
-                    <span className="security-status-pill active">已开启</span>
-                  </div>
-
-                  {/* 传输加密 */}
-                  <div className="security-data-item">
-                    <div>
-                      <div className="security-data-title">传输加密</div>
-                      <div className="security-data-desc">本地与云端通信使用端到端加密通道</div>
-                    </div>
-                    <span className="security-status-pill active">已开启</span>
-                  </div>
-
-                  {/* 删除保护 */}
-                  <div className="security-data-item flex-align">
-                    <div>
-                      <div className="security-data-title">删除保护</div>
-                      <div className="security-data-desc">开启后优先移到废纸篓/回收站，关闭后按系统删除</div>
-                    </div>
-                    <label className="switch-toggle">
-                      <input
-                        type="checkbox"
-                        checked={settings.deletionProtection !== false}
-                        onChange={(e) => updateSettings({ deletionProtection: e.target.checked })}
-                      />
-                      <span className="slider-round"></span>
-                    </label>
-                  </div>
-
-                  {/* 批量删除审批 */}
-                  <div className="security-data-item flex-align">
-                    <div>
-                      <div className="security-data-title">批量删除审批</div>
-                      <div className="security-data-desc">需开启删除保护。一次删除达到该数量时需要审批</div>
-                    </div>
-                    <div className="security-number-input-wrapper">
-                      <input
-                        type="number"
-                        className="security-number-input"
-                        value={settings.bulkDeletionLimit || "50"}
-                        onChange={(e) => updateSettings({ bulkDeletionLimit: e.target.value })}
-                        min="1"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 内置运行时 */}
-            <div className="security-card-box full-width">
-              <div className="security-card-header">
-                <div className="security-card-title-group">
-                  <Activity size={18} className="icon-green" />
-                  <h3 className="security-card-title">内置运行时</h3>
-                </div>
-                <label className="switch-toggle">
-                  <input
-                    type="checkbox"
-                    checked={settings.builtinRuntime !== false}
-                    onChange={(e) => updateSettings({ builtinRuntime: e.target.checked })}
-                  />
-                  <span className="slider-round"></span>
-                </label>
-              </div>
-              <p className="security-card-desc">允许使用随包提供的 Node.js、Python 和 Git Bash 工具</p>
-
-              <table className="runtime-table">
-                <thead>
-                  <tr>
-                    <th>工具</th>
-                    <th>说明</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="runtime-tool-cell">
-                      <img src="https://img.icons8.com/color/48/python--v1.png" alt="Python" className="runtime-logo" />
-                      <span>Python</span>
-                    </td>
-                    <td className="runtime-desc-cell">通用编程语言，适用于脚本编写、自动化和数据处理</td>
-                    <td>
-                      <label className="switch-toggle">
-                        <input
-                          type="checkbox"
-                          checked={settings.runtimePython !== false}
-                          disabled={settings.builtinRuntime === false}
-                          onChange={(e) => updateSettings({ runtimePython: e.target.checked })}
-                        />
-                        <span className="slider-round"></span>
-                      </label>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="runtime-tool-cell">
-                      <img src="https://img.icons8.com/fluency/48/node-js.png" alt="Node.js" className="runtime-logo" />
-                      <span>Node.js</span>
-                    </td>
-                    <td className="runtime-desc-cell">基于 Chrome V8 引擎的 JavaScript 运行时，用于服务端开发</td>
-                    <td>
-                      <label className="switch-toggle">
-                        <input
-                          type="checkbox"
-                          checked={settings.runtimeNodejs !== false}
-                          disabled={settings.builtinRuntime === false}
-                          onChange={(e) => updateSettings({ runtimeNodejs: e.target.checked })}
-                        />
-                        <span className="slider-round"></span>
-                      </label>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* 安全审计日志表格 */}
-            <div className="security-card-box full-width font-table">
-              <h3 className="security-card-title" style={{ fontSize: 13, marginBottom: 8 }}>安全审查日志 (最近50条记录)</h3>
-              <div className="audit-logs-table-wrapper" style={{ maxHeight: 120 }}>
-                {auditLogs.length === 0 ? (
-                  <div className="audit-logs-empty">暂无审计日志</div>
-                ) : (
-                  <table className="audit-logs-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>工具名称</th>
-                        <th>参数简述</th>
-                        <th>状态</th>
-                        <th>时间</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map((log) => (
-                        <tr key={log.id}>
-                          <td style={{ color: "var(--text-3)" }}>{log.id}</td>
-                          <td className="log-tool-name" style={{ fontWeight: 600 }}>{log.toolName}</td>
-                          <td className="log-args-cell" title={log.args}>
-                            {log.args ? (log.args.length > 50 ? `${log.args.slice(0, 50)}...` : log.args) : "-"}
-                          </td>
-                          <td>
-                            <span className={`log-status-badge ${log.isError ? "error" : "success"}`}>
-                              {log.isError ? "失败" : "成功"}
-                            </span>
-                          </td>
-                          <td className="log-time-cell">
-                            {new Date(log.createdAt).toLocaleString("zh-CN", { hour12: false })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
-        );
 
       default:
         return (
@@ -1287,61 +998,6 @@ export default function SettingsModal() {
     }
   };
 
-  const renderSecuritySubModal = () => {
-    if (!subModalType) return null;
-    const rules = getSecurityRulesList(subModalType);
-    const title = subModalType === "file" ? "文件路径白名单规则"
-                : subModalType === "command" ? "安全命令放行规则"
-                : "网络安全域名规则";
-    const placeholder = subModalType === "file" ? "请输入绝对文件路径，例如 /Users/username/safe-folder"
-                      : subModalType === "command" ? "请输入允许放行的命令，例如 git"
-                      : "请输入允许访问的域名，例如 api.deepseek.com";
-
-    return (
-      <div className="security-submodal-overlay" onClick={() => setSubModalType(null)}>
-        <div className="security-submodal-panel" onClick={(e) => e.stopPropagation()}>
-          <div className="security-submodal-header">
-            <h3 className="security-submodal-title">{title}</h3>
-            <button className="security-submodal-close" onClick={() => setSubModalType(null)}>
-              <X size={16} />
-            </button>
-          </div>
-          <div className="security-submodal-body">
-            <div className="submodal-input-row">
-              <input
-                type="text"
-                className="settings-input"
-                placeholder={placeholder}
-                value={newRuleInput}
-                onChange={(e) => setNewRuleInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddSecurityRule(subModalType);
-                }}
-              />
-              <button className="settings-btn" onClick={() => handleAddSecurityRule(subModalType)}>
-                <Plus size={14} style={{ marginRight: 4 }} /> 添加
-              </button>
-            </div>
-            <div className="submodal-rules-list">
-              {rules.length === 0 ? (
-                <div className="rules-empty">暂无白名单规则，智能体在该项操作前将默认请求授权</div>
-              ) : (
-                rules.map((rule, idx) => (
-                  <div key={idx} className="rule-item-row">
-                    <span className="rule-text" title={rule}>{rule}</span>
-                    <button className="rule-del-btn" title="删除" onClick={() => handleRemoveSecurityRule(subModalType, rule)}>
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="settings-modal-overlay" onMouseDown={() => setShowSettings(false)}>
       <div className="settings-modal-panel" onMouseDown={(e) => e.stopPropagation()}>
@@ -1355,7 +1011,6 @@ export default function SettingsModal() {
           {renderSidebar()}
           <div className="settings-content-area">{renderContent()}</div>
         </div>
-        {renderSecuritySubModal()}
       </div>
     </div>
   );
