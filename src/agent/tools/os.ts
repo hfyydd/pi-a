@@ -111,6 +111,70 @@ async function appleScriptClick(x: number, y: number, action: "left" | "right" |
   }
 }
 
+/** 静默无位移点击算法：在目标坐标执行点击后，毫秒级恢复用户原本的鼠标指针位置（支持 macOS 与 Windows） */
+async function performSilentClick(
+  x: number,
+  y: number,
+  action: "left_click" | "right_click" | "double_click" | "triple_click" | "middle_click" = "left_click",
+  isCliclickInstalled = false
+): Promise<void> {
+  const isMac = Deno.build.os === "darwin";
+  const isWin = Deno.build.os === "windows";
+
+  if (isMac) {
+    if (isCliclickInstalled) {
+      let origX: string | undefined;
+      let origY: string | undefined;
+      try {
+        const pOut = await runCmd("cliclick", ["p"]);
+        const parts = pOut.split(",");
+        if (parts.length === 2) {
+          origX = parts[0].trim();
+          origY = parts[1].trim();
+        }
+      } catch {}
+
+      let code = "c";
+      if (action === "right_click") code = "rc";
+      else if (action === "double_click" || action === "triple_click") code = "dc";
+      else if (action === "middle_click") code = "mc";
+
+      if (origX && origY) {
+        // 在单个 process 指令中完成点击与毫秒级坐标归位，鼠标指针对用户零打扰
+        await runCmd("cliclick", [`${code}:${x},${y}`, `m:${origX},${origY}`]);
+      } else {
+        await runCmd("cliclick", [`${code}:${x},${y}`]);
+      }
+      return;
+    }
+
+    const act = action === "right_click" ? "right" : (action === "double_click" ? "double" : "left");
+    await appleScriptClick(x, y, act);
+    return;
+  }
+
+  if (isWin) {
+    const flagDown = action === "right_click" ? 0x0008 : 0x0002;
+    const flagUp = action === "right_click" ? 0x0010 : 0x0004;
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type -AssemblyName System.Drawing
+      $orig = [System.Windows.Forms.Cursor]::Position
+      [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point(${Math.round(x)}, ${Math.round(y)})
+      $signature = '[DllImport("user32.dll")] public static extern void mouse_event(int flags, int dx, int dy, int cButtons, int dwExtraInfo);'
+      $type = Add-Type -MemberDefinition $signature -Name 'Win32Mouse' -Namespace 'Win32' -PassThru
+      $type::mouse_event(${flagDown}, 0, 0, 0, 0)
+      $type::mouse_event(${flagUp}, 0, 0, 0, 0)
+      [System.Windows.Forms.Cursor]::Position = $orig
+    `;
+    try {
+      await runCmd("powershell", ["-NoProfile", "-Command", psScript]);
+    } catch (e) {
+      console.error("[os.ts] Windows silent click error:", e);
+    }
+  }
+}
+
 /** 原生 AppleScript 文本输入降级 */
 async function appleScriptType(text: string): Promise<void> {
   const safeText = escapeAppleScript(text);
@@ -236,20 +300,10 @@ export const computerTool: AgentTool<typeof computerSchema, { action: string; de
       }
       const [x, y] = p.coordinate;
       try {
-        if (isCliclickInstalled) {
-          let code = "c";
-          if (action === "right_click") code = "rc";
-          else if (action === "double_click" || action === "triple_click") code = "dc";
-          else if (action === "middle_click") code = "mc";
-          await runCmd("cliclick", [`${code}:${x},${y}`]);
-        } else {
-          // Native AppleScript Fallback
-          const act = action === "right_click" ? "right" : (action === "double_click" ? "double" : "left");
-          await appleScriptClick(x, y, act);
-        }
+        await performSilentClick(x, y, action, isCliclickInstalled);
         return {
-          content: [{ type: "text", text: `✓ 已在坐标 (${x}, ${y}) 执行 ${action}` }],
-          details: { action, x, y, method: isCliclickInstalled ? "cliclick" : "applescript" },
+          content: [{ type: "text", text: `✓ 已在坐标 (${x}, ${y}) 静默无位移执行 ${action}` }],
+          details: { action, x, y, silent: true, method: isCliclickInstalled ? "cliclick-restore" : "native-restore" },
         };
       } catch (e) {
         return {
@@ -431,20 +485,14 @@ const clickSchema = Type.Object({
 export const mouseClickTool: AgentTool<typeof clickSchema, { x: number; y: number }> = {
   name: "mouse_click",
   label: "鼠标点击",
-  description: "在屏幕坐标 (x,y) 处点击鼠标。默认左键单击。支持 cliclick 与原生 AppleScript 双模式自动降级。",
+  description: "在屏幕坐标 (x,y) 处执行静默无位移点击鼠标（在 1ms 内自动归位指针）。支持 cliclick 与原生 AppleScript/Powershell 多模式静默降级。",
   parameters: clickSchema,
   execute: async (_id, p) => {
     const isCliclickInstalled = await hasCliclick();
-    let action = "c";
-    if (p.double) action = "dc";
-    else if (p.button === "right") action = "rc";
+    const act = p.double ? "double_click" : (p.button === "right" ? "right_click" : "left_click");
     try {
-      if (isCliclickInstalled) {
-        await runCmd("cliclick", [`${action}:${p.x},${p.y}`]);
-      } else {
-        await appleScriptClick(p.x, p.y, p.double ? "double" : (p.button === "right" ? "right" : "left"));
-      }
-      return { content: [{ type: "text", text: `✓ 已${p.double ? "双" : p.button === "right" ? "右键" : ""}点击 (${p.x},${p.y})` }], details: { x: p.x, y: p.y } };
+      await performSilentClick(p.x, p.y, act, isCliclickInstalled);
+      return { content: [{ type: "text", text: `✓ 已${p.double ? "双" : p.button === "right" ? "右键" : ""}静默点击 (${p.x},${p.y})` }], details: { x: p.x, y: p.y } };
     } catch (e) {
       return { content: [{ type: "text", text: `❌ 点击失败：${(e as Error).message}\n（需在「系统设置 > 隐私与安全 > 辅助功能」授权）` }], details: { x: p.x, y: p.y } };
     }
