@@ -973,27 +973,42 @@ export async function handleApi(req: Request, path: string): Promise<Response> {
       setMcpTools(tools);
       return json({ ok: true, toolCount: tools.length });
     }
-    // GET /api/system/permissions — 诊断 Computer Use 系统权限及依赖
+    // GET /api/system/permissions — 诊断 Computer Use 系统权限及依赖（纯 C API 静默检查，绝不出弹出/不强开系统偏好）
     if (path === "/api/system/permissions" && req.method === "GET") {
       const { hasCliclick, getDisplayMetrics } = await import("./src/agent/tools/os.ts");
       const cliclickInstalled = await hasCliclick();
       const metrics = await getDisplayMetrics();
 
       let accessibilityGranted = false;
-      try {
-        const cmd = new Deno.Command("osascript", {
-          args: ["-e", 'tell application "System Events" to get name of first process'],
-          stdout: "null", stderr: "null"
-        });
-        const r = await cmd.output();
-        accessibilityGranted = r.code === 0;
-      } catch {}
+      let screenRecordingGranted = true;
+
+      if (Deno.build.os === "darwin") {
+        try {
+          const appServices = Deno.dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", {
+            AXIsProcessTrusted: { parameters: [], result: "bool" },
+          });
+          accessibilityGranted = appServices.symbols.AXIsProcessTrusted();
+          appServices.close();
+        } catch {
+          accessibilityGranted = false;
+        }
+
+        try {
+          const coreGraphics = Deno.dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", {
+            CGPreflightScreenCaptureAccess: { parameters: [], result: "bool" },
+          });
+          screenRecordingGranted = coreGraphics.symbols.CGPreflightScreenCaptureAccess();
+          coreGraphics.close();
+        } catch {
+          screenRecordingGranted = true;
+        }
+      }
 
       return json({
         os: Deno.build.os,
         cliclickInstalled,
         accessibilityGranted,
-        screenRecordingGranted: true,
+        screenRecordingGranted,
         metrics,
       });
     }
